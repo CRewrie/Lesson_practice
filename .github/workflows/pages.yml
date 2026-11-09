@@ -24,6 +24,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      # Stamp asset URLs with the commit so browsers fetch the new files after each deploy.
+      - run: sed -i "s/__V__/${GITHUB_SHA::7}/g" index.html lesson10/index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
