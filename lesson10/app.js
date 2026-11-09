@@ -63,6 +63,31 @@ function romajiToKana(text) {
 }
 const toHira = s => [...s].map(c => { const cp = c.codePointAt(0); return cp >= 0x30a1 && cp <= 0x30f6 ? String.fromCodePoint(cp - 0x60) : c; }).join("");
 const norm = s => toHira(String(s).replace(/[\s。、．，.,!?！？～~\[\]［］]/g, "").toLowerCase());
+const toKata = s => [...s].map(c => { const cp = c.codePointAt(0); return cp >= 0x3041 && cp <= 0x3096 ? String.fromCodePoint(cp + 0x60) : c; }).join("");
+// ー → the vowel it lengthens, so "koonaa" (こおなあ) matches コーナー.
+const VOWEL_OF = (() => { const m = {}; ["あかさたなはまやらわがざだばぱぁゃ", "いきしちにひみりぎじぢびぴぃ", "うくすつぬふむゆるぐずづぶぷぅゅ", "えけせてねへめれげぜでべぺぇ", "おこそとのほもよろをごぞどぼぽぉょ"].forEach((row, i) => [...row].forEach(c => m[c] = "あいうえお"[i])); return m; })();
+const unLong = s => [...s].reduce((o, c) => o + (c === "ー" ? (VOWEL_OF[o.slice(-1)] || "") : c), "");
+// Live romaji → kana inside an input, like a Japanese keyboard. A trailing single "n" waits (it may become な/に…).
+// kata: write katakana. Letters typed in CAPITALS always become katakana.
+function liveKana(inp, kata = false) {
+  inp.setAttribute("autocorrect", "off");
+  inp.addEventListener("input", e => {
+    if (e.isComposing) return;
+    const v = inp.value;
+    if (!/[a-z'\-]/i.test(v)) return;
+    const out = v.replace(/[a-z'\-]+/gi, (run, off) => {
+      let hold = "";
+      // a trailing "n" / "nn" waits for the next letter: "onn" + "a" → おんな, "kon" + "b" → こんb
+      if (off + run.length === v.length) { const m = run.match(/n{1,2}$/i); if (m) { hold = m[0]; run = run.slice(0, -hold.length); } }
+      const up = run === run.toUpperCase(), k = romajiToKana(run);
+      // letters still waiting (e.g. "K" before "O") keep their case so CAPITALS stay katakana
+      return (kata || up ? toKata(k) : k).replace(/[a-z]+/g, x => up ? x.toUpperCase() : x) + hold;
+    });
+    if (out !== v) inp.value = out;
+  });
+}
+// Finish a field: convert any leftover romaji (e.g. a final "n").
+const finishKana = (v, kata = false) => v.replace(/[a-z'\-]+/gi, run => { const k = romajiToKana(run); return kata || run === run.toUpperCase() ? toKata(k) : k; });
 const KANA_RO = (() => {
   const skip = new Set(["si", "ti", "tu", "hu", "zi", "sya", "syu", "syo", "zya", "zyu", "zyo", "tya", "tyu", "tyo", "jya", "jyu", "jyo", "cya", "cyu", "cyo", "-", "wo"]);
   const m = { "を": "o", "ー": "-" };
@@ -712,18 +737,20 @@ function typing() {
     const v = list[i]; let hinted = 0, done = false;
     app.innerHTML = `${backBtn}<div class="plabel"><span>${i + 1} / ${list.length}</span><span>✓ ${right}</span></div><div class="progress"><div style="width:${i / list.length * 100}%"></div></div>
       <div class="card stack"><div class="q-emo">${v.emo}</div><div style="text-align:center"><b style="font-size:20px">${esc(meaning(v))}</b><div class="muted small">${esc(other(v))}</div></div>
-      <input class="type-in" id="in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="kana or romaji (e.g. reizouko)">
+      <input class="type-in" id="in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type romaji → becomes kana (e.g. reizouko)">
       <div class="ro" id="pv" style="min-height:18px;font-size:16px"></div>
       <div class="row" style="justify-content:space-between"><button class="btn" id="hint">💡 Hint</button><button class="btn primary" id="go">Check</button></div><div id="fb"></div></div>`;
     const inp = $("#in"); inp.focus();
-    inp.oninput = () => { $("#pv").textContent = /[a-z]/i.test(inp.value) ? "→ " + romajiToKana(inp.value) : ""; };
+    const kata = /[ァ-ヺ]/.test(v.kana);
+    liveKana(inp, kata);
     const target = norm(v.kana);
-    $("#hint").onclick = () => { hinted++; const shown = [...toHira(v.kana.replace(/\s/g, ""))].slice(0, hinted).join(""); $("#pv").textContent = `starts with: ${shown}…`; speak(v.kana); };
+    $("#hint").onclick = () => { hinted++; const shown = [...v.kana.replace(/\s/g, "")].slice(0, hinted).join(""); $("#pv").textContent = `starts with: ${shown}…`; speak(v.kana); };
     const check = () => {
       if (done) { i++; show(); return; }
-      const raw = inp.value; const got = norm(/[a-z]/i.test(raw) ? romajiToKana(raw) : raw);
+      inp.value = finishKana(inp.value, kata);
+      const raw = inp.value; const got = unLong(norm(raw));
       if (!got) return;
-      done = true; const ok = got === target;
+      done = true; const ok = got === unLong(target);
       if (ok && !hinted) { right++; word(v.id, 1); } else if (!ok) word(v.id, -1);
       beep(ok); if (ok) addXP(3);
       $("#fb").innerHTML = `<div class="fb ${ok ? "ok" : "no"}"><div class="h">${ok ? (hinted ? "Correct (with hint)" : "せいかい！") : "The answer is:"}</div><div class="row">${spk(v.kana)}<span class="ja jp" style="font-size:24px">${jpOf(v)}</span> <span class="ro">${kanaToRomaji(v.kana)}</span></div>${ok ? "" : `<div class="small">You wrote: ${esc(raw)}</div>`}</div>`;
@@ -967,7 +994,7 @@ function you() {
   ];
   app.innerHTML = `${backBtn}<h2>💬 Talk about you</h2><p class="sub">Worksheet part &lt;5&gt; plus two bonus questions. Type in kana or romaji (auto-converted), or tap word chips. Your answers are saved here.</p>
     <div class="stack">${Qs.map((q, i) => `<div class="card"><div class="row">${spk(q.q)}<span class="jp" style="font-size:19px">${i + 1}) ${J(q.q)}</span></div>
-      <input class="type-in" data-i="${i}" value="${esc(state.you[i] || "")}" placeholder="your answer…" autocomplete="off" autocapitalize="off" spellcheck="false" style="margin-top:8px">
+      <input class="type-in" data-i="${i}" value="${esc(state.you[i] || "")}" placeholder="romaji → kana · CAPITALS → カタカナ" autocomplete="off" autocapitalize="off" spellcheck="false" style="margin-top:8px">
       <div class="row" style="margin-top:6px">${q.help.map(h => `<span class="chip" data-add="${i}" data-w="${esc(h)}">${esc(h)}</span>`).join("")}</div>
       <div id="yf${i}" class="small" style="margin-top:6px"></div>
       <details style="margin-top:6px"><summary class="small muted">Model answers</summary>${q.model.map(m => `<div class="row">${spk(m)}<span class="jp">${J(m)}</span></div>`).join("")}</details></div>`).join("")}
@@ -990,7 +1017,8 @@ function you() {
   };
   $$("input.type-in").forEach(inp => {
     const i = +inp.dataset.i;
-    inp.onchange = inp.onblur = () => { if (/[a-z]/i.test(inp.value)) inp.value = romajiToKana(inp.value); state.you[i] = inp.value; save(); feedback(i); };
+    liveKana(inp);
+    inp.onchange = inp.onblur = () => { inp.value = finishKana(inp.value); state.you[i] = inp.value; save(); feedback(i); };
     inp.onkeydown = e => { if (e.key === "Enter") inp.blur(); };
     feedback(i);
   });
