@@ -169,7 +169,9 @@ table.t th { color: var(--muted); font-weight: 500; font-size: 12px; text-transf
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .stage.town { background: linear-gradient(#1f2b3a 0 30%, var(--grass) 30% 72%, var(--road) 72%); } }
 :root[data-theme="dark"] .stage.town { background: linear-gradient(#1f2b3a 0 30%, var(--grass) 30% 72%, var(--road) 72%); }
 .obj { position: absolute; transform: translate(-50%, -50%); line-height: 1; text-align: center; transition: left .45s, top .45s, transform .2s; }
-.obj .lbl { display: table; margin: 2px auto 0; pointer-events: none; font: 600 11px var(--jp); color: var(--ink); background: color-mix(in srgb, var(--panel) 85%, transparent); border-radius: 6px; padding: 1px 4px; margin-top: 2px; white-space: nowrap; }
+.obj .lbl { display: table; margin: 2px auto 0; pointer-events: none; line-height: 1.25; font: 600 12px var(--jp); color: var(--ink); background: color-mix(in srgb, var(--panel) 85%, transparent); border-radius: 6px; padding: 1px 4px; margin-top: 2px; white-space: nowrap; }
+.obj .lbl rt { font-size: .62em; }
+.ico-svg { display: inline-block; vertical-align: -0.1em; }
 body.hide-labels .obj .lbl { display: none; }
 .stage.tap .obj { cursor: pointer; }
 .stage.tap .obj:hover { transform: translate(-50%, -50%) scale(1.08); }
@@ -249,7 +251,7 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
   .mem { gap: 6px; }
   .mc { font-size: 14px; }
   .mc .e { font-size: 26px; }
-  .obj .lbl { font-size: 9px; }
+  .obj .lbl { font-size: 10px; }
   .stage { aspect-ratio: 4 / 3; }
   .rush-card { font-size: 32px; }
 }

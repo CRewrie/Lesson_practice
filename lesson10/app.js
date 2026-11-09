@@ -15,6 +15,22 @@ const pick = a => a[Math.floor(Math.random() * a.length)];
 const sample = (a, n) => shuffle(a).slice(0, n);
 const vById = id => VOCAB.find(v => v.id === id);
 const jpOf = v => v.kanji ? ruby(v.kanji) : esc(v.kana);
+// Write kana words in kanji with furigana. Works chunk by chunk (text is spaced by word + particle).
+const KANJI_KEYS = Object.keys(KANJI).sort((a, b) => b.length - a.length);
+const AFTER = /^(?:$|の|に|が|は|も|や|と|を|で|へ|ね|よ|など|です|でした|じゃ|だ|か$|まで|から)/;
+function kanjify(text) {
+  return String(text ?? "")
+    .replace(/(おとこ|おんな)の ?こ(?=[がはもをにと。、\s]|$)/g, (m, w) => `${KANJI[w]}の{子|こ}`)
+    .replace(/(おとこ|おんな)の ?ひと/g, (m, w) => `${KANJI[w]}の{人|ひと}`)
+    .replace(/タイりょうり/g, "タイ{料理|りょうり}")
+    .split(/([\s、。（）()？！?!「」・—→=…]+)/)
+    .map(ch => {
+      if (!ch || /[{}<>]/.test(ch)) return ch;
+      for (const k of KANJI_KEYS) if (ch.startsWith(k) && AFTER.test(ch.slice(k.length))) return KANJI[k] + ch.slice(k.length);
+      return ch;
+    }).join("");
+}
+const J = s => ruby(kanjify(esc(s)));
 
 // ---------- romaji ----------
 const ROMAJI = (() => {
@@ -241,7 +257,7 @@ function flashcards(deck, reverse) {
 }
 
 // ---------- 2. grammar notes ----------
-function ex(ja, tr) { return `<div class="ex">${spk(ja)}<div class="t"><div class="ja">${ruby(ja)}</div><div class="ro">${esc(kanaToRomaji(ja))}</div><div class="tr">${tr}</div></div></div>`; }
+function ex(ja, tr) { return `<div class="ex">${spk(ja)}<div class="t"><div class="ja">${ruby(kanjify(ja))}</div><div class="ro">${esc(kanaToRomaji(ja))}</div><div class="tr">${tr}</div></div></div>`; }
 function grammar() {
   const posGrid = [["", "うえ<br>{上|うえ}", ""], ["ひだり<br>{左|ひだり}", "📦<br><b>なか {中|なか}</b>", "みぎ<br>{右|みぎ}"], ["", "した<br>{下|した}", ""]];
   app.innerHTML = `${backBtn}<h2>Grammar in pictures</h2><p class="sub">Six points. Tap 🔊 to hear each example. Then play the games!</p>
@@ -321,14 +337,14 @@ function rush() {
       <div class="timer"><div id="tb" style="width:100%"></div></div>
       <div class="card" style="margin-top:12px"><div class="rush-card" id="rc"></div><p class="center small muted" id="rm" style="text-align:center;min-height:22px"></p>
       <div class="rush-btns"><button class="a" data-k="a">← あります</button><button class="i" data-k="i">います →</button></div></div>`;
-    const next = () => { cur = pick(pool.filter(p => p !== cur)); $("#rc").innerHTML = `<span class="emo">${cur.emo}</span><span class="jp">${esc(cur.kana)}</span>`; };
+    const next = () => { cur = pick(pool.filter(p => p !== cur)); $("#rc").innerHTML = `<span class="emo">${cur.emo}</span><span class="jp">${J(cur.kana)}</span>`; };
     const answer = k => {
       if (ended) return;
       const rc = $("#rc");
       if (k === cur.kind) { combo++; score += combo >= 5 ? 2 : 1; beep(true); rc.classList.remove("pop"); void rc.offsetWidth; rc.classList.add("pop"); $("#rm").textContent = "";
         if (cur.id) word(cur.id, 0.5); }
       else { combo = 0; beep(false); rc.classList.remove("shake"); void rc.offsetWidth; rc.classList.add("shake"); mistakes.push(cur);
-        $("#rm").innerHTML = `<span class="jp">${esc(cur.kana)}</span> → <b class="${cur.kind === "i" ? "hl-i" : "hl-a"}">${cur.kind === "i" ? "います" : "あります"}</b> (${cur.kind === "i" ? "alive & moving" : "thing / plant / place"})`; }
+        $("#rm").innerHTML = `<span class="jp">${J(cur.kana)}</span> → <b class="${cur.kind === "i" ? "hl-i" : "hl-a"}">${cur.kind === "i" ? "います" : "あります"}</b> (${cur.kind === "i" ? "alive & moving" : "thing / plant / place"})`; }
       $("#sc").textContent = score; $("#cb").textContent = combo >= 3 ? `🔥 combo ×${combo}${combo >= 5 ? " (double!)" : ""}` : "";
       next();
     };
@@ -344,7 +360,7 @@ function rush() {
         if (score > (state.stars.rushBest || 0)) { state.stars.rushBest = score; save(); }
         const uniq = [...new Set(mistakes)];
         app.innerHTML = `${backBtn}<div class="card stack" style="text-align:center"><div class="result-big">${score}</div><p>${starStr(s)} · best ${state.stars.rushBest}</p>
-          ${uniq.length ? `<div style="text-align:left"><b>Review:</b>${uniq.map(m => `<div class="jp" style="font-size:18px">${m.emo} ${esc(m.kana)} → <span class="${m.kind === "i" ? "hl-i" : "hl-a"}">${m.kind === "i" ? "います" : "あります"}</span></div>`).join("")}</div>` : "<p>No mistakes! 🎯</p>"}
+          ${uniq.length ? `<div style="text-align:left"><b>Review:</b>${uniq.map(m => `<div class="jp" style="font-size:18px">${m.emo} ${J(m.kana)} → <span class="${m.kind === "i" ? "hl-i" : "hl-a"}">${m.kind === "i" ? "います" : "あります"}</span></div>`).join("")}</div>` : "<p>No mistakes! 🎯</p>"}
           <div class="row" style="justify-content:center"><button class="btn primary" onclick="route()">Play again</button><a class="btn" href="#/where">Next: Where is it? →</a></div></div>`;
         if (s === 3) confetti();
       }
@@ -372,11 +388,11 @@ const TABLE_POS = { "うえ": { x: 50, y: 40 }, "した": { x: 50, y: 66 } };
 const posFor = (w, p) => (w.a.e === "table" && TABLE_POS[p]) || POS[p];
 
 function anchorHTML(a, x = 50, y = 54) {
-  if (a.e === "table") return `<div class="css-table obj" style="left:${x}%;top:${y + 6}%;width:30%;z-index:2"><div class="top"></div><div class="legs"><i></i><i></i></div><span class="lbl">${esc(a.k)}</span></div>`;
-  return `<div class="obj" style="left:${x}%;top:${y}%;font-size:20cqw;z-index:2">${a.e}<span class="lbl">${esc(a.k)}</span></div>`;
+  if (a.e === "table") return `<div class="css-table obj" style="left:${x}%;top:${y + 6}%;width:30%;z-index:2"><div class="top"></div><div class="legs"><i></i><i></i></div><span class="lbl">${J(a.k)}</span></div>`;
+  return `<div class="obj" style="left:${x}%;top:${y}%;font-size:20cqw;z-index:2">${a.e}<span class="lbl">${J(a.k)}</span></div>`;
 }
 function targetHTML(t, p, id = "tg") {
-  return `<div class="obj" id="${id}" style="left:${p.x}%;top:${p.y}%;font-size:${9 * (p.s || 1)}cqw;z-index:${p.z ?? 4}">${t.e}<span class="lbl">${esc(t.k)}</span></div>`;
+  return `<div class="obj" id="${id}" style="left:${p.x}%;top:${p.y}%;font-size:${9 * (p.s || 1)}cqw;z-index:${p.z ?? 4}">${t.e}<span class="lbl">${J(t.k)}</span></div>`;
 }
 // Build one random "where" puzzle.
 function makeWhere() {
@@ -402,13 +418,13 @@ function whereStage(w, showTarget = true) {
   if (w.type === "box") {
     const lbl = w.a.k;
     const inside = { x: 42, y: 55 }, outside = { x: 82, y: 60 };
-    return `<div class="boxc" style="left:42%;top:55%;width:44%;height:62%;z-index:1"></div><div class="obj" style="left:42%;top:17%;z-index:3"><span class="lbl">${esc(lbl)}</span></div>` +
+    return `<div class="boxc" style="left:42%;top:55%;width:44%;height:62%;z-index:1"></div><div class="obj" style="left:42%;top:17%;z-index:3"><span class="lbl">${J(lbl)}</span></div>` +
       (showTarget ? targetHTML(w.t, w.p === "なか" ? inside : outside) : "");
   }
-  if (w.type === "next") return `<div class="obj" style="left:35%;top:52%;font-size:22cqw">${w.a.e}<span class="lbl">${esc(w.a.k)}</span></div>` +
-    (showTarget ? `<div class="obj" id="tg" style="left:65%;top:52%;font-size:22cqw">${w.t.e}<span class="lbl">${esc(w.t.k)}</span></div>` : "");
-  return `<div class="obj" style="left:18%;top:52%;font-size:19cqw">${w.a.e}<span class="lbl">${esc(w.a.k)}</span></div><div class="obj" style="left:82%;top:52%;font-size:19cqw">${w.b.e}<span class="lbl">${esc(w.b.k)}</span></div>` +
-    (showTarget ? `<div class="obj" id="tg" style="left:50%;top:52%;font-size:19cqw">${w.t.e}<span class="lbl">${esc(w.t.k)}</span></div>` : "");
+  if (w.type === "next") return `<div class="obj" style="left:35%;top:52%;font-size:22cqw">${w.a.e}<span class="lbl">${J(w.a.k)}</span></div>` +
+    (showTarget ? `<div class="obj" id="tg" style="left:65%;top:52%;font-size:22cqw">${w.t.e}<span class="lbl">${J(w.t.k)}</span></div>` : "");
+  return `<div class="obj" style="left:18%;top:52%;font-size:19cqw">${w.a.e}<span class="lbl">${J(w.a.k)}</span></div><div class="obj" style="left:82%;top:52%;font-size:19cqw">${w.b.e}<span class="lbl">${J(w.b.k)}</span></div>` +
+    (showTarget ? `<div class="obj" id="tg" style="left:50%;top:52%;font-size:19cqw">${w.t.e}<span class="lbl">${J(w.t.k)}</span></div>` : "");
 }
 const tKind = w => (w.type === "next" || w.type === "between") ? "a" : w.t.kind;
 function whereSentences(w) {
@@ -431,13 +447,13 @@ function where() {
     const finish = (ok, extra = "") => {
       n++; if (ok) { right++; beep(true); addXP(5); } else beep(false);
       $("#fb").innerHTML = `<div class="fb ${ok ? "ok" : "no"}"><div class="h">${ok ? "せいかい！ ✓" : "Not quite"}</div>${extra}
-        <div class="row">${spk(s1)}<span class="ja jp">${esc(s1)}</span></div><div class="row">${spk(s2)}<span class="ja jp">${esc(s2)}</span></div>
+        <div class="row">${spk(s1)}<span class="ja jp">${J(s1)}</span></div><div class="row">${spk(s2)}<span class="ja jp">${J(s2)}</span></div>
         <div class="ro">${esc(kanaToRomaji(s1))}</div></div><div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn primary" id="nx">Next →</button></div>`;
       speak(s1); $("#nx").onclick = round; $("#nx").focus();
       keyHandler = e => { if (e.key === "Enter") round(); };
     };
     if (tapMode) {
-      app.innerHTML = `${head}<div class="card"><p class="small muted">Tap where it goes:</p><div class="q jp">${esc(s1)} ${spk(s1)}</div>
+      app.innerHTML = `${head}<div class="card"><p class="small muted">Tap where it goes:</p><div class="q jp">${J(s1)} ${spk(s1)}</div>
         <div class="stage tap" id="st" style="container-type:inline-size">${whereStage(w, false)}${Object.keys(POS).filter(p => w.opts.includes(p)).map(p => [p, posFor(w, p)]).map(([p, c]) => `<div class="zone" data-p="${p}" style="left:${c.x}%;top:${c.y}%">?</div>`).join("")}</div><div id="fb"></div></div>`;
       speak(s1);
       $$(".zone").forEach(z => z.onclick = () => {
@@ -445,9 +461,9 @@ function where() {
         const ok = z.dataset.p === w.p;
         z.classList.add(ok ? "right" : "wrong");
         $(`.zone[data-p="${w.p}"]`).classList.add("right");
-        $$(".zone").forEach(zz => zz.textContent = zz.dataset.p);
+        $$(".zone").forEach(zz => zz.innerHTML = J(zz.dataset.p));
         $("#st").insertAdjacentHTML("beforeend", targetHTML(w.t, posFor(w, w.p)));
-        finish(ok, ok ? "" : `<p>You chose <b class="jp">${z.dataset.p}</b> (${posHint[z.dataset.p]}). It's <b class="jp">${w.p}</b> (${posHint[w.p]}).</p>`);
+        finish(ok, ok ? "" : `<p>You chose <b class="jp">${J(z.dataset.p)}</b> (${posHint[z.dataset.p]}). It's <b class="jp">${J(w.p)}</b> (${posHint[w.p]}).</p>`);
       });
       return;
     }
@@ -455,15 +471,15 @@ function where() {
     const q = askVerb ? `${w.ref}の ${w.p}に ${w.t.k}が <span class="blank"></span>。` : `${w.t.k}は ${w.ref}の <span class="blank"></span>に ${verb}。`;
     const opts = askVerb ? ["あります", "います"] : shuffle(w.opts);
     app.innerHTML = `${head}<div class="card"><div class="stage" style="container-type:inline-size">${whereStage(w)}</div>
-      <div class="q jp" style="margin-top:12px">${q}</div>
-      <div class="opts ${askVerb ? "two" : "two"}">${opts.map((o, i) => `<button class="opt" data-o="${o}"><span class="key">${i + 1}</span>${o} <span class="small muted" style="font-family:var(--ui)">${askVerb ? "" : posHint[o] || ""}</span></button>`).join("")}</div><div id="fb"></div></div>`;
+      <div class="q jp" style="margin-top:12px">${ruby(kanjify(q))}</div>
+      <div class="opts ${askVerb ? "two" : "two"}">${opts.map((o, i) => `<button class="opt" data-o="${o}"><span class="key">${i + 1}</span>${J(o)} <span class="small muted" style="font-family:var(--ui)">${askVerb ? "" : posHint[o] || ""}</span></button>`).join("")}</div><div id="fb"></div></div>`;
     const ans = askVerb ? verb : w.p;
     const choose = b => {
       if ($("#fb").innerHTML) return;
       const ok = b.dataset.o === ans;
       $$(".opt").forEach(x => { x.disabled = true; if (x.dataset.o === ans) x.classList.add("right"); });
       if (!ok) b.classList.add("wrong");
-      finish(ok, ok ? "" : askVerb ? `<p>${esc(w.t.k)} is ${tKind(w) === "i" ? "alive and moves → <b>います</b>" : "a thing → <b>あります</b>"}.</p>` : `<p><b class="jp">${b.dataset.o}</b> = ${posHint[b.dataset.o]}. Here it's <b class="jp">${w.p}</b> = ${posHint[w.p]}.</p>`);
+      finish(ok, ok ? "" : askVerb ? `<p>${J(w.t.k)} is ${tKind(w) === "i" ? "alive and moves → <b>います</b>" : "a thing → <b>あります</b>"}.</p>` : `<p><b class="jp">${J(b.dataset.o)}</b> = ${posHint[b.dataset.o]}. Here it's <b class="jp">${J(w.p)}</b> = ${posHint[w.p]}.</p>`);
     };
     $$(".opt").forEach(b => b.onclick = () => choose(b));
     keyHandler = e => { const b = $$(".opt")[+e.key - 1]; if (b) choose(b); };
@@ -480,10 +496,10 @@ const SCENES = {
       { id: "switch", e: "🎚️", x: 18, y: 44, f: 4.5, l: "スイッチ", say: "ドアの みぎに スイッチが あります。" },
       { id: "window", e: "🪟", x: 34, y: 24, f: 13, l: "まど", say: "テーブルの うえに まどが あります。" },
       { id: "tree", e: "🌳", x: 34, y: 22, f: 5, l: "き", say: "まどの そとに きが あります。", z: 3 },
-      { id: "shelf", e: "📚", x: 53, y: 36, f: 13, l: "たな", say: "まどの みぎに たなが あります。" },
+      { id: "shelf", e: SHELF, x: 53, y: 37, f: 16, l: "たな", say: "まどの みぎに たなが あります。" },
       { id: "clock", e: "⏰", x: 53, y: 11, f: 5, l: "とけい", say: "たなの うえに とけいが あります。" },
       { id: "table", shape: "table", x: 33, y: 76, w: 24, l: "テーブル", say: "へやに テーブルが あります。" },
-      { id: "box", e: "📦", x: 30, y: 63, f: 6, l: "はこ", say: "テーブルの うえに はこが あります。", reveal: "🔋", rsay: "はこの なかに でんちが あります。", z: 4 },
+      { id: "box", e: "📦", x: 41, y: 63, f: 6, l: "はこ", say: "テーブルの うえに はこが あります。", reveal: "🔋", rsay: "はこの なかに でんちが あります。", z: 4 },
       { id: "cat", e: "🐈", x: 34, y: 87, f: 6, l: "ねこ", say: "テーブルの したに ねこが います。", z: 4 },
       { id: "dog", e: "🐕", x: 57, y: 84, f: 7, l: "いぬ", say: "テーブルと ベッドの あいだに いぬが います。" },
       { id: "girl", e: "👧", x: 67, y: 44, f: 8, l: "おんなのこ", say: "たなの みぎに おんなのこが います。" },
@@ -535,9 +551,9 @@ const SCENES = {
 };
 function sceneHTML(sc) {
   return sc.items.filter(it => it.l).map(it => {
-    if (it.shape === "table") return `<div class="css-table obj" data-id="${it.id}" style="left:${it.x}%;top:${it.y}%;width:${it.w}%;z-index:2"><div class="top"></div><div class="legs"><i></i><i></i></div><span class="lbl">${it.l}</span></div>`;
-    if (it.shape === "fridge") return `<div class="obj" data-id="${it.id}" style="left:${it.x}%;top:${it.y}%;z-index:2;width:11%"><div class="css-fridge" style="position:relative;transform:none;width:100%"></div><span class="lbl">${it.l}</span></div>`;
-    return `<div class="obj" data-id="${it.id}" style="left:${it.x}%;top:${it.y}%;font-size:${it.f}cqw;z-index:${it.z ?? 2}">${it.e}<span class="lbl">${it.l}</span></div>`;
+    if (it.shape === "table") return `<div class="css-table obj" data-id="${it.id}" style="left:${it.x}%;top:${it.y}%;width:${it.w}%;z-index:2"><div class="top"></div><div class="legs"><i></i><i></i></div><span class="lbl">${J(it.l)}</span></div>`;
+    if (it.shape === "fridge") return `<div class="obj" data-id="${it.id}" style="left:${it.x}%;top:${it.y}%;z-index:2;width:11%"><div class="css-fridge" style="position:relative;transform:none;width:100%"></div><span class="lbl">${J(it.l)}</span></div>`;
+    return `<div class="obj" data-id="${it.id}" style="left:${it.x}%;top:${it.y}%;font-size:${it.f}cqw;z-index:${it.z ?? 2}">${it.e}<span class="lbl">${J(it.l)}</span></div>`;
   }).join("");
 }
 function scene() {
@@ -554,7 +570,7 @@ function scene() {
     const it = sc.items.find(i => i.id === o.dataset.id);
     if (it.reveal && !opened.has(it.id)) { opened.add(it.id); o.insertAdjacentHTML("beforeend", `<span style="position:absolute;left:50%;top:-30%;transform:translateX(-50%);font-size:5cqw;white-space:nowrap" class="pop">${it.reveal}</span>`); }
     const lines = [it.say, it.rsay].filter(Boolean);
-    $("#info").innerHTML = lines.map(l => `<div class="row">${spk(l)}<span class="jp" style="font-size:20px">${esc(l)}</span></div><div class="ro">${esc(kanaToRomaji(l))}</div>`).join("") + (it.reveal ? `<p class="small muted">📂 It opened! Look what's inside.</p>` : "");
+    $("#info").innerHTML = lines.map(l => `<div class="row">${spk(l)}<span class="jp" style="font-size:20px">${J(l)}</span></div><div class="ro">${esc(kanaToRomaji(l))}</div>`).join("") + (it.reveal ? `<p class="small muted">📂 It opened! Look what's inside.</p>` : "");
     speak(lines.join(" "));
   });
   $("#hunt").onclick = () => hunt(which);
@@ -570,7 +586,7 @@ function hunt(which) {
     }
     const h = list[i]; tries = 0;
     app.innerHTML = `${backBtn}<div class="plabel"><span>${sc.name} hunt · ${i + 1} / ${list.length}</span><span>✓ ${right}</span></div><div class="progress"><div style="width:${i / list.length * 100}%"></div></div>
-      <div class="card"><div class="q jp">${esc(h.q)} ${spk(h.q)}</div><p class="small muted">Tap the answer in the picture.</p>
+      <div class="card"><div class="q jp">${J(h.q)} ${spk(h.q)}</div><p class="small muted">Tap the answer in the picture.</p>
       <div class="stage tap ${sc.cls}" id="st" style="container-type:inline-size">${sceneHTML(sc)}</div><div id="fb"></div></div>`;
     speak(h.q);
     $$("#st .obj").forEach(o => o.onclick = () => {
@@ -578,13 +594,13 @@ function hunt(which) {
       if (o.dataset.id === h.a) {
         o.classList.add("found"); if (tries === 0) right++; beep(true); addXP(3);
         $("#fb").dataset.done = 1;
-        $("#fb").innerHTML = `<div class="fb ok"><div class="h">${tries === 0 ? "せいかい！" : "Found it!"}</div><div class="row">${spk(h.ans)}<span class="ja jp">${esc(h.ans)}</span></div><div class="ro">${esc(kanaToRomaji(h.ans))}</div></div>
+        $("#fb").innerHTML = `<div class="fb ok"><div class="h">${tries === 0 ? "せいかい！" : "Found it!"}</div><div class="row">${spk(h.ans)}<span class="ja jp">${J(h.ans)}</span></div><div class="ro">${esc(kanaToRomaji(h.ans))}</div></div>
           <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn primary" id="nx">Next →</button></div>`;
         speak(h.ans); $("#nx").onclick = () => { i++; show(); }; keyHandler = e => { if (e.key === "Enter") { i++; show(); } };
       } else {
         tries++; beep(false); o.classList.remove("miss"); void o.offsetWidth; o.classList.add("miss");
         const it = sc.items.find(x => x.id === o.dataset.id);
-        $("#fb").innerHTML = `<div class="fb no">That's <span class="jp">${esc(it.l)}</span>: <span class="jp">${esc(it.say)}</span> — try again!</div>`;
+        $("#fb").innerHTML = `<div class="fb no">That's <span class="jp">${J(it.l)}</span>: <span class="jp">${J(it.say)}</span> — try again!</div>`;
       }
     });
   };
@@ -612,8 +628,8 @@ function builder() {
       <div class="row" style="justify-content:space-between;margin-top:12px"><button class="btn" id="clr">Clear</button><button class="btn primary" id="chk">Check</button></div></div>`;
     const cls = t => PARTICLES.includes(t) ? "part" : VERBS.includes(t) ? "verb" : "";
     const draw = () => {
-      $("#slots").innerHTML = placed.map((b, j) => `<button class="tok ${cls(b.t)}" data-j="${j}">${esc(b.t)}</button>`).join("");
-      $("#bank").innerHTML = bank.map(b => `<button class="tok ${cls(b.t)} ${placed.includes(b) ? "used" : ""}" data-k="${b.k}">${esc(b.t)}</button>`).join("");
+      $("#slots").innerHTML = placed.map((b, j) => `<button class="tok ${cls(b.t)}" data-j="${j}">${J(b.t)}</button>`).join("");
+      $("#bank").innerHTML = bank.map(b => `<button class="tok ${cls(b.t)} ${placed.includes(b) ? "used" : ""}" data-k="${b.k}">${J(b.t)}</button>`).join("");
       $$("#slots .tok").forEach(x => x.onclick = () => { if (checked) return; placed.splice(+x.dataset.j, 1); $("#slots").className = "slots jp"; draw(); });
       $$("#bank .tok").forEach(x => x.onclick = () => { if (checked) return; const b = bank.find(bb => bb.k === +x.dataset.k); if (!placed.includes(b)) { placed.push(b); speak(b.t, 1); } draw(); });
     };
@@ -626,7 +642,7 @@ function builder() {
       if (got === S.t) {
         checked = true; if (firstTry) right++; beep(true); addXP(4);
         $("#slots").className = "slots jp ok";
-        $("#fb").innerHTML = `<div class="fb ok"><div class="row">${spk(sentence)}<span class="ja jp">${esc(sentence)}</span></div><div class="ro">${esc(sentRomaji(toks))}</div></div>`;
+        $("#fb").innerHTML = `<div class="fb ok"><div class="row">${spk(sentence)}<span class="ja jp">${J(sentence)}</span></div><div class="ro">${esc(sentRomaji(toks))}</div></div>`;
         speak(sentence); $("#chk").textContent = "Next →";
       } else {
         firstTry = false; beep(false); $("#slots").className = "slots jp no";
@@ -759,19 +775,19 @@ function store() {
     const s = script[step++];
     ctl.innerHTML = "";
     if (s.who) {
-      add(`<div class="msg"><div class="who">${s.who}</div>${s.ja ? `<div class="row" style="flex-wrap:nowrap">${spk(s.ja)}<span class="ja">${esc(s.ja)}</span></div><div class="ro">${esc(kanaToRomaji(s.ja))}</div>` : ""}<div class="tr">${esc(s.tr)}</div></div>`);
+      add(`<div class="msg"><div class="who">${s.who}</div>${s.ja ? `<div class="row" style="flex-wrap:nowrap">${spk(s.ja)}<span class="ja">${J(s.ja)}</span></div><div class="ro">${esc(kanaToRomaji(s.ja))}</div>` : ""}<div class="tr">${esc(s.tr)}</div></div>`);
       if (s.ja) speak(s.ja);
       ctl.innerHTML = `<button class="btn primary" id="c">Continue →</button>`; $("#c").onclick = nextStep; $("#c").focus(); return;
     }
     if (s.me || s.quiz) {
       const opts = shuffle(s.me ? s.ask : s.opts); asks++; let first = true;
-      ctl.innerHTML = `${s.quiz ? `<p><b>${esc(s.quiz)}</b></p>` : `<p class="small muted">What do you say?</p>`}<div class="opts">${opts.map((o, i) => `<button class="opt" data-i="${i}"><span class="key">${i + 1}</span>${esc(o[0])}</button>`).join("")}</div><div id="sfb"></div>`;
+      ctl.innerHTML = `${s.quiz ? `<p><b>${esc(s.quiz)}</b></p>` : `<p class="small muted">What do you say?</p>`}<div class="opts">${opts.map((o, i) => `<button class="opt" data-i="${i}"><span class="key">${i + 1}</span>${J(o[0])}</button>`).join("")}</div><div id="sfb"></div>`;
       $$("#ctl .opt").forEach(b => b.onclick = () => {
         const o = opts[+b.dataset.i];
         if (o[s.me ? 2 : 1] === true) {
           if (first) right++; beep(true);
-          if (s.me) { add(`<div class="msg me"><div class="who">🧑‍💼 ミラー (you)</div><div class="ja">${esc(o[0])}</div><div class="tr">${esc(o[1])}</div></div>`); speak(o[0]); }
-          else add(`<div class="msg me"><div class="who">✔</div>${esc(o[0])}</div>`);
+          if (s.me) { add(`<div class="msg me"><div class="who">🧑‍💼 ミラー (you)</div><div class="ja">${J(o[0])}</div><div class="tr">${esc(o[1])}</div></div>`); speak(o[0]); }
+          else add(`<div class="msg me"><div class="who">✔</div>${J(o[0])}</div>`);
           nextStep();
         } else { first = false; beep(false); b.classList.add("wrong"); b.disabled = true; $("#sfb").innerHTML = `<div class="fb no">${o[s.me ? 2 : 1]}</div>`; }
       });
@@ -786,9 +802,9 @@ function store() {
         <div class="shelf">${items.map((it, i) => `<div data-i="${i}">📦<small>${i % 3 === 0 ? rows[i / 3] : "&nbsp;"}</small></div>`).join("")}</div><div id="sfb"></div>`;
       asks++; let first = true;
       $$("#ctl .shelf div").forEach(d => d.onclick = () => {
-        const i = +d.dataset.i; d.innerHTML = `${items[i].e}<small>${esc(items[i].k)}</small>`;
+        const i = +d.dataset.i; d.innerHTML = `${items[i].e}<small>${J(items[i].k)}</small>`;
         if (items[i].k === s.shelf) { if (first) right++; beep(true); d.style.background = "var(--good-soft)"; add(`<div class="msg me"><div class="who">✔</div>🐟 Found it — いちばん した!</div>`); setTimeout(nextStep, 600); }
-        else { first = false; beep(false); $("#sfb").innerHTML = `<div class="fb no">${i < 6 ? "That's not the bottom row — <b>いちばん した</b> = the very bottom." : `Right row! But that's ${esc(items[i].k)} ${items[i].e}. Try its neighbours.`}</div>`; }
+        else { first = false; beep(false); $("#sfb").innerHTML = `<div class="fb no">${i < 6 ? "That's not the bottom row — <b>いちばん した</b> = the very bottom." : `Right row! But that's ${J(items[i].k)} ${items[i].e}. Try its neighbours.`}</div>`; }
       });
     }
   };
@@ -824,10 +840,10 @@ function shopGame(right0, asks0) {
     const cq = `すみません。${t.k}は どこですか。`;
     let first = true;
     ctl.innerHTML = `<div class="card stack"><div class="plabel"><span>Customer ${round + 1} / ${N}</span><span>✓ ${right}</span></div>
-      <div class="msg"><div class="who">${custName}</div><div class="row" style="flex-wrap:nowrap">${spk(cq)}<span class="ja">${esc(cq)}</span></div></div>
-      <div class="shelf">${items.map((it, i) => `<div style="${i === ti ? "background:var(--good-soft);border-color:var(--good)" : ""}">${it.e}<small>${esc(it.k)}</small></div>`).join("")}</div>
-      <p class="small muted">You (the clerk) answer: <span class="jp">はい、${esc(t.k)}は …</span></p>
-      <div class="opts">${opts.map((o, i) => `<button class="opt" data-i="${i}"><span class="key">${i + 1}</span>${esc(o)}</button>`).join("")}</div><div id="sfb"></div></div>`;
+      <div class="msg"><div class="who">${custName}</div><div class="row" style="flex-wrap:nowrap">${spk(cq)}<span class="ja">${J(cq)}</span></div></div>
+      <div class="shelf">${items.map((it, i) => `<div style="${i === ti ? "background:var(--good-soft);border-color:var(--good)" : ""}">${it.e}<small>${J(it.k)}</small></div>`).join("")}</div>
+      <p class="small muted">You (the clerk) answer: <span class="jp">はい、${J(t.k)}は …</span></p>
+      <div class="opts">${opts.map((o, i) => `<button class="opt" data-i="${i}"><span class="key">${i + 1}</span>${J(o)}</button>`).join("")}</div><div id="sfb"></div></div>`;
     speak(cq);
     const choose = b => {
       const o = opts[+b.dataset.i];
@@ -860,19 +876,19 @@ function mcqRun({ title, questions, modeId, pass, next }) {
     const q = questions[i];
     const opts = shuffle(q.o.map((o, k) => ({ o, k })));
     app.innerHTML = `${backBtn}<div class="plabel"><span>${title} · ${i + 1} / ${questions.length}</span><span>✓ ${right}</span></div><div class="progress"><div style="width:${i / questions.length * 100}%"></div></div>
-      <div class="card">${q.pic ? `<div class="q-emo">${q.pic}</div>` : ""}<div class="q jp">${ruby(esc(q.q)).replace(/（　）/g, '<span class="blank"></span>')}</div>
-      <div class="opts ${q.o.length === 2 ? "two" : ""}">${opts.map((x, n) => `<button class="opt" data-k="${x.k}"><span class="key">${n + 1}</span>${ruby(x.o)}</button>`).join("")}</div><div id="fb"></div></div>`;
+      <div class="card">${q.pic ? `<div class="q-emo">${q.pic}</div>` : ""}<div class="q jp">${J(q.q).replace(/（　）/g, '<span class="blank"></span>')}</div>
+      <div class="opts ${q.o.length === 2 ? "two" : ""}">${opts.map((x, n) => `<button class="opt" data-k="${x.k}"><span class="key">${n + 1}</span>${J(x.o)}</button>`).join("")}</div><div id="fb"></div></div>`;
     let done = false;
     const choose = b => {
       if (done) return; done = true;
       const k = +b.dataset.k, ok = k === 0;
       $$(".opt").forEach(x => { x.disabled = true; if (+x.dataset.k === 0) x.classList.add("right"); });
-      if (!ok) { b.classList.add("wrong"); wrong.push({ q: ruby(esc(q.q)), a: ruby(q.o[0]) }); }
+      if (!ok) { b.classList.add("wrong"); wrong.push({ q: J(q.q), a: J(q.o[0]) }); }
       else right++;
       if (q.word) word(q.word, ok ? 1 : -1);
       beep(ok);
       const sayText = q.say || (/^[ぁ-んァ-ン]/.test(q.o[0]) ? q.o[0] : "");
-      $("#fb").innerHTML = `<div class="fb ${ok ? "ok" : "no"}"><div class="h">${ok ? "せいかい！ ✓" : "✗ " + (q.why?.[k] || "Not quite.")}</div><div>${q.ok || ""}</div>${sayText ? `<div class="row" style="margin-top:6px">${spk(sayText)}<span class="ja jp">${ruby(sayText)}</span></div>` : ""}</div>
+      $("#fb").innerHTML = `<div class="fb ${ok ? "ok" : "no"}"><div class="h">${ok ? "せいかい！ ✓" : "✗ " + (q.why?.[k] || "Not quite.")}</div><div>${q.ok || ""}</div>${sayText ? `<div class="row" style="margin-top:6px">${spk(sayText)}<span class="ja jp">${J(sayText)}</span></div>` : ""}</div>
         <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn primary" id="nx">Next →</button></div>`;
       $("#nx").onclick = () => { i++; show(); }; $("#nx").focus();
       keyHandler = e => { if (e.key === "Enter") { i++; show(); } };
@@ -915,7 +931,7 @@ function worksheet() {
       Score so far: ${cnt.filter(x => x.ok === true).length} ✓ / ${cnt.filter(x => x.ok !== "todo").length}. Very solid! The two big lessons: <b>まえ vs うえ</b> and <b>おとこのこ</b> (not just こ).</p>
     <div class="stack">${WORKSHEET.map(sec => `<div class="card"><h3 style="margin-top:0">${esc(sec.sec)}</h3>${sec.items.map(it => `
       <div class="ws-item"><div class="mine">${mark(it.ok)}${it.n} ${it.mine}</div>
-        ${it.fix ? `<div class="row"><span class="fix">→ ${esc(it.fix)}</span>${spk(it.fix.replace(/^[QA]: /, ""))}</div>` : ""}
+        ${it.fix ? `<div class="row"><span class="fix">→ ${J(it.fix)}</span>${spk(it.fix.replace(/^[QA]: /, ""))}</div>` : ""}
         ${it.note ? `<div class="small muted">${it.note}</div>` : ""}</div>`).join("")}</div>`).join("")}
     <div class="card"><h3 style="margin-top:0">🔁 Redo the tricky ones</h3><p class="small">Fix your answers with the right picture in mind:</p><div id="redo"></div></div>
     </div>`;
@@ -930,7 +946,7 @@ function worksheet() {
   const showR = () => {
     if (r >= redo.length) { box.innerHTML = `<p>✨ All fixed! Now try <a href="#/you">Talk about you</a> for part &lt;5&gt;.</p>`; return; }
     const q = redo[r]; const opts = shuffle(q.o.map((o, k) => ({ o, k })));
-    box.innerHTML = `<div class="q-emo">${q.pic}</div><div class="q jp" style="font-size:19px">${esc(q.q).replace("（　）", '<span class="blank"></span>')}</div><div class="opts">${opts.map(x => `<button class="opt" data-k="${x.k}">${esc(x.o)}</button>`).join("")}</div><div id="rfb"></div>`;
+    box.innerHTML = `<div class="q-emo">${q.pic}</div><div class="q jp" style="font-size:19px">${J(q.q).replace("（　）", '<span class="blank"></span>')}</div><div class="opts">${opts.map(x => `<button class="opt" data-k="${x.k}">${esc(x.o)}</button>`).join("")}</div><div id="rfb"></div>`;
     $$("#redo .opt").forEach(b => b.onclick = () => {
       const k = +b.dataset.k;
       if (k === 0) { beep(true); addXP(3); b.classList.add("right"); $("#rfb").innerHTML = `<div class="fb ok">${q.ok} <button class="btn primary" id="rn" style="margin-left:6px">Next</button></div>`; $("#rn").onclick = () => { r++; showR(); }; }
@@ -950,11 +966,11 @@ function you() {
     { q: "れいぞうこの なかに なにが ありますか。", verb: "あり", help: ["ぎゅうにゅう", "たまご", "ビール", "やさい", "なにも ありません", "や", "など", "が", "あります"], model: ["たまごや ぎゅうにゅう などが あります。", "なにも ありません。😅"] },
   ];
   app.innerHTML = `${backBtn}<h2>💬 Talk about you</h2><p class="sub">Worksheet part &lt;5&gt; plus two bonus questions. Type in kana or romaji (auto-converted), or tap word chips. Your answers are saved here.</p>
-    <div class="stack">${Qs.map((q, i) => `<div class="card"><div class="row">${spk(q.q)}<span class="jp" style="font-size:19px">${i + 1}) ${esc(q.q)}</span></div>
+    <div class="stack">${Qs.map((q, i) => `<div class="card"><div class="row">${spk(q.q)}<span class="jp" style="font-size:19px">${i + 1}) ${J(q.q)}</span></div>
       <input class="type-in" data-i="${i}" value="${esc(state.you[i] || "")}" placeholder="your answer…" autocomplete="off" autocapitalize="off" spellcheck="false" style="margin-top:8px">
       <div class="row" style="margin-top:6px">${q.help.map(h => `<span class="chip" data-add="${i}" data-w="${esc(h)}">${esc(h)}</span>`).join("")}</div>
       <div id="yf${i}" class="small" style="margin-top:6px"></div>
-      <details style="margin-top:6px"><summary class="small muted">Model answers</summary>${q.model.map(m => `<div class="row">${spk(m)}<span class="jp">${esc(m)}</span></div>`).join("")}</details></div>`).join("")}
+      <details style="margin-top:6px"><summary class="small muted">Model answers</summary>${q.model.map(m => `<div class="row">${spk(m)}<span class="jp">${J(m)}</span></div>`).join("")}</details></div>`).join("")}
     <div class="row" style="justify-content:center"><button class="btn primary" id="copy">📋 Copy my answers</button></div></div>`;
   const feedback = i => {
     const v = norm(state.you[i] || ""), q = Qs[i], el = $(`#yf${i}`);

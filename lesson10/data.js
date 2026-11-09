@@ -2,6 +2,27 @@
 // Lektion 10 (Minna no Nihongo I) — content.
 // Markup in Japanese strings: {漢字|かな} renders as furigana.
 
+// たな: there is no shelf emoji, so a small drawn bookcase (scales with font-size like an emoji).
+const SHELF = `<svg class="ico-svg" viewBox="0 0 64 64" width="1em" height="1em" aria-label="たな"><rect x="8" y="3" width="48" height="59" rx="3" fill="#8b5a2b"/><rect x="12" y="7" width="40" height="51" fill="#4a2e14"/><rect x="12" y="22" width="40" height="3" fill="#8b5a2b"/><rect x="12" y="39" width="40" height="3" fill="#8b5a2b"/><rect x="14" y="10" width="5" height="12" fill="#c0392b"/><rect x="20" y="12" width="4" height="10" fill="#2d6cdf"/><rect x="25" y="9" width="6" height="13" fill="#2e7d4f"/><rect x="32" y="11" width="4" height="11" fill="#e0a84a"/><rect x="40" y="16" width="10" height="6" rx="1" fill="#d9a066"/><rect x="15" y="29" width="12" height="10" rx="2" fill="#d9a066"/><rect x="30" y="27" width="4" height="12" fill="#8e44ad"/><rect x="35" y="28" width="5" height="11" fill="#c0392b"/><rect x="41" y="26" width="4" height="13" fill="#2d6cdf"/><circle cx="22" cy="51" r="5" fill="#2e7d4f"/><rect x="19" y="52" width="6" height="6" fill="#b5452f"/><rect x="34" y="45" width="14" height="13" rx="1" fill="#e8eef2"/></svg>`;
+
+// Kana → kanji (with furigana) for display. Matched at the start of a word chunk, before a particle.
+const KANJI = {
+  "おとこのこ": "{男|おとこ}の{子|こ}", "おんなのこ": "{女|おんな}の{子|こ}", "おとこ": "{男|おとこ}", "おんな": "{女|おんな}", "ひと": "{人|ひと}",
+  "いぬ": "{犬|いぬ}", "ねこ": "{猫|ねこ}", "ぞう": "{象|ぞう}", "き": "{木|き}", "もの": "{物|もの}", "でんち": "{電池|でんち}", "はこ": "{箱|はこ}",
+  "れいぞうこ": "{冷蔵庫|れいぞうこ}", "たな": "{棚|たな}", "まど": "{窓|まど}", "こうえん": "{公園|こうえん}", "きっさてん": "{喫茶店|きっさてん}",
+  "のりば": "{乗|の}り{場|ば}", "けん": "{県|けん}", "うえ": "{上|うえ}", "した": "{下|した}", "まえ": "{前|まえ}", "みぎ": "{右|みぎ}",
+  "ひだり": "{左|ひだり}", "なか": "{中|なか}", "そと": "{外|そと}", "となり": "{隣|となり}", "ちかく": "{近|ちか}く", "あいだ": "{間|あいだ}",
+  "とうきょう": "{東京|とうきょう}",
+  // earlier lessons
+  "つくえ": "{机|つくえ}", "とけい": "{時計|とけい}", "ほん": "{本|ほん}", "くるま": "{車|くるま}", "へや": "{部屋|へや}", "にわ": "{庭|にわ}",
+  "うち": "{家|うち}", "みせ": "{店|みせ}", "がっこう": "{学校|がっこう}", "としょかん": "{図書館|としょかん}", "ゆうびんきょく": "{郵便局|ゆうびんきょく}",
+  "ぎんこう": "{銀行|ぎんこう}", "びょういん": "{病院|びょういん}", "えき": "{駅|えき}", "てがみ": "{手紙|てがみ}", "しゃしん": "{写真|しゃしん}",
+  "かいぎしつ": "{会議室|かいぎしつ}", "ぎゅうにゅう": "{牛乳|ぎゅうにゅう}", "たまご": "{卵|たまご}", "はな": "{花|はな}", "とり": "{鳥|とり}",
+  "さかな": "{魚|さかな}", "かぎ": "{鍵|かぎ}", "さいふ": "{財布|さいふ}", "でんわ": "{電話|でんわ}", "やさい": "{野菜|やさい}", "おちゃ": "お{茶|ちゃ}",
+  "こめ": "{米|こめ}", "とうふ": "{豆腐|とうふ}", "とうがらし": "{唐辛子|とうがらし}", "せんせい": "{先生|せんせい}", "しろい": "{白|しろ}い",
+  "なに": "{何|なに}", "いま": "{今|いま}",
+};
+
 // kind: "i" = living thing (います), "a" = thing / place / plant (あります), "p" = position word, "x" = other
 const VOCAB = [
   // verbs & adjective
@@ -26,7 +47,7 @@ const VOCAB = [
   { id: "reizouko", kana: "れいぞうこ", kanji: "{冷蔵庫|れいぞうこ}", de: "Kühlschrank", en: "fridge", emo: "🧊", cat: "Things", kind: "a" },
   { id: "teeburu", kana: "テーブル", de: "(Ess-) Tisch", en: "table", emo: "🍽️", cat: "Things", kind: "a" },
   { id: "beddo", kana: "ベッド", de: "Bett", en: "bed", emo: "🛏️", cat: "Things", kind: "a" },
-  { id: "tana", kana: "たな", kanji: "{棚|たな}", de: "Regal", en: "shelf", emo: "📚", cat: "Things", kind: "a" },
+  { id: "tana", kana: "たな", kanji: "{棚|たな}", de: "Regal", en: "shelf", emo: SHELF, cat: "Things", kind: "a" },
   { id: "doa", kana: "ドア", de: "Tür", en: "door", emo: "🚪", cat: "Things", kind: "a" },
   { id: "mado", kana: "まど", kanji: "{窓|まど}", de: "Fenster", en: "window", emo: "🪟", cat: "Things", kind: "a" },
   // places
@@ -94,7 +115,7 @@ const SENTENCES = [
   { t: "がっこう の となり に としょかん が あります", de: "Neben der Schule ist eine Bibliothek.", en: "There is a library next to the school.", pic: "🏫👯📚" },
   { t: "ゆうびんきょく の まえ に ポスト が あります", de: "Vor der Post ist ein Briefkasten.", en: "There is a mailbox in front of the post office.", pic: "🏤🔜📮" },
   { t: "ベッド の した に かばん が あります", de: "Unter dem Bett ist eine Tasche.", en: "There is a bag under the bed.", pic: "🛏️⬇️👜" },
-  { t: "まど の みぎ に たな が あります", de: "Rechts vom Fenster ist ein Regal.", en: "There is a shelf to the right of the window.", pic: "🪟➡️📚" },
+  { t: "まど の みぎ に たな が あります", de: "Rechts vom Fenster ist ein Regal.", en: "There is a shelf to the right of the window.", pic: `🪟➡️${SHELF}` },
   { t: "テーブル の うえ に なに が あります か", de: "Was ist auf dem Tisch?", en: "What is on the table?", pic: "🍽️⬆️❓" },
   { t: "にわ に だれ が います か", de: "Wer ist im Garten?", en: "Who is in the garden?", pic: "🏡❓🧍" },
   { t: "ぎんこう と コンビニ の あいだ に ATM が あります", de: "Zwischen Bank und Konbini ist ein Geldautomat.", en: "There is an ATM between the bank and the konbini.", pic: "🏦🏧🏪" },
