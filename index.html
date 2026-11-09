@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson Practice</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="top"><h1><span>日本語</span> Lesson Practice</h1></header>
+<main>
+  <h2>Lessons</h2>
+  <p class="sub">Interactive practice for each textbook lesson: vocabulary, grammar, games and a boss exam.</p>
+  <div class="path">
+    <a class="tile" href="lesson10/"><span class="ico">🐈📦</span><h4>Lektion 10 — あります・います</h4>
+      <p>There is / where is: people, animals, things, positions (うえ・した・まえ…), や…など, the Asia Store conversation.</p>
+      <span class="stars" id="l10"></span></a>
+  </div>
+  <p class="small muted" style="margin-top:18px">More practice: <a href="https://crewrie.github.io/Language_Quiz/">Grammar quizzes (Language_Quiz)</a></p>
+</main>
+<script>
+try {
+  const s = JSON.parse(localStorage.getItem("lesson10.v1") || "{}");
+  const n = Object.entries(s.stars || {}).filter(([k]) => k !== "rushBest").reduce((a, [, v]) => a + v, 0);
+  if (n) document.getElementById("l10").textContent = `⭐ ${n} / 39 · ${s.xp || 0} XP`;
+} catch (_) {}
+</script>
+</body>
+</html>
