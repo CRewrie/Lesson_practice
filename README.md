@@ -22,6 +22,31 @@ A 13-step path. Every step gives XP and up to 3 stars:
 
 Audio uses the browser's Japanese text-to-speech voice. Progress is saved in `localStorage`.
 
+## Lektion 11 — いくつ・どのくらい (`lesson11/`)
+
+Counters and lengths of time, as a 14-step path:
+
+1. **Vocabulary cards**: all lesson words, including ひとつ…とお and the family words.
+2. **Grammar & counter tables**: tap any reading to hear it. Irregular readings are red.
+3. **Which counter?**: a 45-second rush between ～つ, ～にん, ～まい and ～だい.
+4. **Count it!**: count the pictures and pick or type the reading (よにん, やっつ, …).
+5. **Order up!**: café and post-office customers order; fill the tray. Later rounds are listening only.
+6. **How long?**: hours, minutes, days, weeks, months and years — read, hear and type.
+7. **Sentence builder**: the decoy tiles tempt you to put a particle after the number.
+8. **Memory match** and 9. **Spell it**.
+10. **Post office role-play**: small talk with the caretaker, then send a parcel to Australia.
+11. **Particle or ✕?**: where a particle goes, and where nothing goes.
+12. **My worksheets**: feedback on the handwritten pages.
+13. **Talk about you**: family, time in Japan, travel time.
+14. **Boss exam**.
+
+## Code layout
+
+- `assets/core.js`: the shared engine (progress, audio, romaji → kana typing, kanji with furigana, flashcards, sentence builder, memory, typing, multiple choice, router).
+- `assets/style.css`: shared styles.
+- `lessonNN/data.js`: the lesson's content and its `LESSON` settings.
+- `lessonNN/app.js`: the lesson's path (`MODES`) and its own games. It ends with `boot()`.
+
 ## Run locally
 
 ```sh

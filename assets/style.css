@@ -255,3 +255,23 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
   .stage { aspect-ratio: 4 / 3; }
   .rush-card { font-size: 32px; }
 }
+
+/* lesson 11: counting games */
+.count-grid { display: flex; flex-wrap: wrap; gap: 6px 10px; justify-content: center; align-items: center; font-size: 40px; line-height: 1.1; min-height: 96px; max-width: 330px; margin: 0 auto 10px; }
+.rush-btns .c { border-color: var(--line); line-height: 1.3; padding: 12px 8px; }
+.rush-btns .c:hover { border-color: var(--accent); }
+.dur-big { font: 700 46px var(--ui); text-align: center; margin: 6px 0; display: flex; gap: 10px; justify-content: center; align-items: center; }
+.dur-big.jp { font: 600 34px var(--jp); }
+td.irr, .irr { color: var(--accent); font-weight: 700; }
+table.ctr td { font-size: 15px; cursor: pointer; white-space: nowrap; }
+table.ctr th { text-transform: none; letter-spacing: 0; font-family: var(--jp); font-size: 14px; color: var(--ink); }
+table.ctr th .small { font: 11px var(--ui); color: var(--muted); }
+.menu-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 8px; }
+.menu-row.bad { border-color: var(--bad); background: var(--bad-soft); }
+.menu-row .me { font-size: 30px; line-height: 1; }
+.menu-row .mk { flex: 1; font-size: 17px; }
+.stepper { display: flex; align-items: center; gap: 10px; }
+.stepper b { min-width: 22px; text-align: center; font-size: 20px; }
+.stepper button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--bg); cursor: pointer; font-size: 22px; line-height: 1; }
+.stepper button:hover { border-color: var(--accent); }
+.blur { filter: blur(7px); user-select: none; -webkit-user-select: none; }

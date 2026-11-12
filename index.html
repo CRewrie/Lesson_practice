@@ -17,16 +17,21 @@
   <div class="path">
     <a class="tile" href="lesson10/"><span class="ico">🐈📦</span><h4>Lektion 10 — あります・います</h4>
       <p>There is / where is: people, animals, things, positions (うえ・した・まえ…), や…など, the Asia Store conversation.</p>
-      <span class="stars" id="l10"></span></a>
+      <span class="stars" data-key="lesson10.v1" data-max="39"></span></a>
+    <a class="tile" href="lesson11/"><span class="ico">🍎✉️⏱️</span><h4>Lektion 11 — いくつ・どのくらい</h4>
+      <p>Counting: ひとつ…とお, ～にん, ～まい, ～だい. How long: ～じかん, ～しゅうかん, ～かげつ, ～ねん, ぐらい, だけ. The post office conversation.</p>
+      <span class="stars" data-key="lesson11.v1" data-max="42"></span></a>
   </div>
   <p class="small muted" style="margin-top:18px">More practice: <a href="https://crewrie.github.io/Language_Quiz/">Grammar quizzes (Language_Quiz)</a></p>
 </main>
 <script>
-try {
-  const s = JSON.parse(localStorage.getItem("lesson10.v1") || "{}");
-  const n = Object.entries(s.stars || {}).filter(([k]) => k !== "rushBest").reduce((a, [, v]) => a + v, 0);
-  if (n) document.getElementById("l10").textContent = `⭐ ${n} / 39 · ${s.xp || 0} XP`;
-} catch (_) {}
+for (const el of document.querySelectorAll("[data-key]")) {
+  try {
+    const s = JSON.parse(localStorage.getItem(el.dataset.key) || "{}");
+    const n = Object.entries(s.stars || {}).filter(([k]) => k !== "rushBest").reduce((a, [, v]) => a + v, 0);
+    if (n) el.textContent = `⭐ ${n} / ${el.dataset.max} · ${s.xp || 0} XP`;
+  } catch (_) {}
+}
 </script>
 </body>
 </html>

@@ -188,3 +188,29 @@ const WORKSHEET = [
     { n: "3)", mine: "うちの ちかくに なにが ありますか。", ok: "todo", fix: "コンビニや こうえんが あります。", note: "" },
   ]},
 ];
+
+// Lesson settings read by the shared engine (assets/core.js).
+const LESSON = {
+  key: "lesson10.v1",
+  name: "Lesson 10",
+  title: `Lektion 10 — <span class="jp">あります・います</span>`,
+  sub: "There is / where is — things, people, animals and where they are.",
+  confetti: ["🎉", "✨", "🐈", "🐕", "🐼", "🐘", "🌸", "⭐"],
+  memoryGroups: { "People & animals": "👨", "Things": "📦", "Places": "🏪", "Positions": "⬆️" },
+  kindNote: v => v.kind === "i" ? `<div class="small hl-i">alive & moves → います</div>` : v.kind === "a" ? `<div class="small hl-a">thing / place → あります</div>` : "",
+  // decoy tiles for the sentence builder
+  builderExtra(toks) {
+    const verb = toks.find(t => VERBS.includes(t));
+    const swap = { "あります": "います", "います": "あります", "ありません": "いません", "いません": "ありません" }[verb];
+    return [swap, pick(["を", "で"])];
+  },
+  whyWrong(got, want) {
+    if (got.includes("を")) return "を is for objects of action verbs — not used with あります/います.";
+    if (got.includes("で")) return "で marks where an <i>action</i> happens. For existence the place takes <b>に</b>.";
+    const v = want.find(t => VERBS.includes(t)), gv = got.find(t => VERBS.includes(t));
+    if (gv && gv !== v) return v.startsWith("い") ? "Is it alive and moving? Then it's <b>います/いません</b>." : "It's a thing / place / plant → <b>あります/ありません</b>.";
+    if (got.length < want.length) return `Use ${want.length} tiles (you have ${got.length}).`;
+    const firstBad = got.findIndex((t, k) => t !== want[k]);
+    return `The first ${firstBad} tile${firstBad === 1 ? " is" : "s are"} right. Pattern: <b class="jp">[reference] の [position] に [thing] が [verb]</b>.`;
+  },
+};
