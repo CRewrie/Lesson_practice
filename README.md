@@ -40,12 +40,26 @@ Counters and lengths of time, as a 14-step path:
 13. **Talk about you**: family, time in Japan, travel time.
 14. **Boss exam**.
 
+## しつもん道場 — Question Dojo (`questions/`)
+
+All the question words (なに, だれ, どこ, いつ, どうして, どれ, どの, どんな, どう, いくら, いくつ, どのくらい, the なん + counter family, the polite versions, なにも / だれも) in one trainer. It is built around active recall rather than a fixed path:
+
+- **Every answer is typed.** There are no options to pick from. Romaji turns into kana while typing, and the particles を・は・へ may be typed as they sound (o, wa, e).
+- **Spaced repetition.** Each card sits in a Leitner box and comes back after 1, 3, 7, 14 and 30 days. A missed card returns a few cards later in the same session until it is answered from memory.
+- **Five card types, mixed.** Meaning → word, fill the gap, ask for the underlined part of an answer, translate a whole question, and dictation. The harder types open a few at a time once a word's recall card has been answered right twice.
+- **New words** are shown once, typed once, and tested two cards later. Four per session.
+- **Interview game.** A stranger with twelve hidden facts: type your own questions to uncover them.
+- **Question map.** The system on one page: the particle rule, こ-そ-あ-ど, なに vs なん, polite pairs.
+
+Append `?day=3` to the URL to pretend it is three days later (useful for testing the schedule).
+
 ## Code layout
 
 - `assets/core.js`: the shared engine (progress, audio, romaji → kana typing, kanji with furigana, flashcards, sentence builder, memory, typing, multiple choice, router).
 - `assets/style.css`: shared styles.
 - `lessonNN/data.js`: the lesson's content and its `LESSON` settings.
 - `lessonNN/app.js`: the lesson's path (`MODES`) and its own games. It ends with `boot()`.
+- `questions/`: the Question Dojo. It uses the shared helpers but has its own dashboard and scheduler.
 
 ## Run locally
 

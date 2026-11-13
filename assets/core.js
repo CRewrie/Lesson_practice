@@ -437,7 +437,8 @@ function vocabQ(v) {
 
 // ---------- router ----------
 let keyHandler = null; const timers = [];
-document.addEventListener("keydown", e => { if (e.target.matches("input, textarea")) return; keyHandler && keyHandler(e); });
+// A focused button handles Enter itself (as a click), so shortcuts skip it; otherwise "Next" would fire twice.
+document.addEventListener("keydown", e => { if (e.target.matches("input, textarea, button, a")) return; keyHandler && keyHandler(e); });
 const ROUTES = { "": home };
 function route() {
   keyHandler = null; timers.splice(0).forEach(clearInterval);
