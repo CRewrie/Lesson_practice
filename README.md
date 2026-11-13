@@ -44,10 +44,10 @@ Counters and lengths of time, as a 14-step path:
 
 All the question words (なに, だれ, どこ, いつ, どうして, どれ, どの, どんな, どう, いくら, いくつ, どのくらい, the なん + counter family, the polite versions, なにも / だれも) in one trainer. It is built around active recall rather than a fixed path:
 
+- **Nothing is locked.** On the dashboard you choose the topics (any combination of the six groups), the kind of exercise and the number of cards, then start.
 - **Every answer is typed.** There are no options to pick from. Romaji turns into kana while typing, and the particles を・は・へ may be typed as they sound (o, wa, e).
-- **Spaced repetition.** Each card sits in a Leitner box and comes back after 1, 3, 7, 14 and 30 days. A missed card returns a few cards later in the same session until it is answered from memory.
-- **Five card types, mixed.** Meaning → word, fill the gap, ask for the underlined part of an answer, translate a whole question, and dictation. The harder types open a few at a time once a word's recall card has been answered right twice.
-- **New words** are shown once, typed once, and tested two cards later. Four per session.
+- **Exercises.** Everything mixed · whole questions (ask for the underlined part of an answer, translate, or build the sentence from its translation and the answer) · gaps · listening (dictation) · single words.
+- **Spaced repetition in the background.** Each card sits in a Leitner box (1, 3, 7, 14, 30 days). Inside your choice, due cards come first, then unseen ones, then the shakiest. A missed card returns a few cards later in the same round. "Review due cards" collects everything that is due.
 - **Interview game.** A stranger with twelve hidden facts: type your own questions to uncover them.
 - **Question map.** The system on one page: the particle rule, こ-そ-あ-ど, なに vs なん, polite pairs.
 

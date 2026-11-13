@@ -1,12 +1,13 @@
 "use strict";
 /* しつもん道場 — Question Dojo.
-   Built for active recall: every answer is typed, cards come back on a spaced schedule
-   (Leitner boxes), new words are tested right after they are shown, and a missed card
-   returns in the same session until it is answered from memory.
+   Built for active recall: every answer is typed. Nothing is locked — you pick the topics, the kind of
+   exercise and the length of a round. In the background each card still sits in a Leitner box, so cards
+   you miss or that are due come up first, and a missed card returns in the same round.
    Shared helpers (typing, audio, kanji display, progress) come from ../assets/core.js. */
 
 // ---------- cards ----------
-// Types: r = meaning → word · c = fill the gap · p = ask for the marked part · t = translate · d = dictation
+// Types: r = meaning → word · c = fill the gap · d = dictation
+//        p = ask for the marked part · t = translate · x = build the whole question from its translation and the answer
 const CARDS = [], byId = {};
 for (const w of QW) {
   const acc = [w.kana, ...(w.alt || [])];
@@ -16,6 +17,7 @@ for (const w of QW) {
     add({ id: `${w.id}:c${i}`, type: "c", q, a, de, accept: [...acc, ...(extra || [])] });
     const full = q.replace("（　）", w.kana);
     if (i === 0 && !/[0-9]/.test(full)) add({ id: `${w.id}:d${i}`, type: "d", full, de, accept: [full] });
+    if (!/[0-9]/.test(full)) add({ id: `${w.id}:x${i}`, type: "x", a, de, deQ: de.split(" — ")[0], src: `${w.id}:c${i}`, q });
   });
   (w.p || []).forEach(([a, accept, de], i) => add({ id: `${w.id}:p${i}`, type: "p", a, accept, de }));
   (w.t || []).forEach(([de, en, accept], i) => add({ id: `${w.id}:t${i}`, type: "t", de, en, accept }));
@@ -25,6 +27,7 @@ const ALSO_OK = { "dochira:c1": ["どこ"], "donokurai:c0": ["なんじかん"],
   "nanpun:c0": ["どのくらい", "どのぐらい"], "nanpun:c1": ["どのくらい", "どのぐらい"], "nannichi:c1": ["どのくらい", "どのぐらい"], "itsu:c1": ["なんがつなんにち"], "nangatsu:c0": ["いつ"],
   "dou:c0": ["いかが"], "ikaga:c0": ["どう"], "doko:c0": ["どちら"], "doko:c2": ["どちら"], "dare:c0": ["どなた"], "nansai:c0": ["おいくつ"], "nansai:c1": ["おいくつ"], "dochira_p:c0": ["どこ"] };
 for (const [id, more] of Object.entries(ALSO_OK)) byId[id].accept.push(...more);
+for (const c of CARDS) if (c.type === "x") c.accept = byId[c.src].accept.map(word => c.q.replace("（　）", word));
 
 // ---------- schedule ----------
 const IV = [0, 1, 3, 7, 14, 30];                       // days until a card in box n is due again
@@ -36,20 +39,8 @@ const srs = state.srs;
 // they sound (o, wa, e) — so "kore wa nan desu ka" is accepted for これは なんですか.
 const key = s => unLong(norm(s)).replace(/を/g, "お").replace(/は/g, "わ").replace(/へ/g, "え");
 const canHear = () => "speechSynthesis" in window && state.sound;
-const introduced = w => !!srs[`${w.id}:r`];
 const box = id => srs[id]?.b ?? -1;
 const isDue = id => srs[id] && srs[id].due <= today();
-// Harder card types (ask the question, translate, dictation) open once the plain recall card has been answered
-// right twice — a few per session, so they never flood the queue.
-const UNLOCK_PER_SESSION = 6;
-function unlock() {
-  let n = 0;
-  for (const c of CARDS) {
-    if (n >= UNLOCK_PER_SESSION) break;
-    if (!srs[c.id] && "ptd".includes(c.type) && box(`${c.w.id}:r`) >= 2 && (c.type !== "d" || box(c.id.replace(":d", ":c")) >= 2)) { srs[c.id] = { b: 0, due: today() }; n++; }
-  }
-  if (n) save();
-}
 function grade(card, ok, hinted, wasDue) {
   const s = srs[card.id] || (srs[card.id] = { b: 0, due: today() });
   if (!ok) { s.b = 0; s.due = today(); }
@@ -59,7 +50,7 @@ function grade(card, ok, hinted, wasDue) {
 const wordLevel = w => { const bs = CARDS.filter(c => c.w === w && srs[c.id]).map(c => srs[c.id].b); return bs.length ? Math.min(...bs) : -1; };
 const BELTS = [[0, "⬜", "White belt"], [8, "🟨", "Yellow belt"], [20, "🟧", "Orange belt"], [35, "🟩", "Green belt"], [55, "🟦", "Blue belt"], [75, "🟫", "Brown belt"], [92, "⬛", "Black belt"]];
 function belt() {
-  const core = CARDS.filter(c => c.type !== "d");
+  const core = CARDS.filter(c => c.type !== "d" && c.type !== "r");
   const pct = Math.round(core.filter(c => box(c.id) >= 3).length / core.length * 100);
   const i = BELTS.findLastIndex(b => pct >= b[0]);
   return { pct, ico: BELTS[i][1], name: BELTS[i][2], next: BELTS[i + 1] };
@@ -72,41 +63,63 @@ const gap = (q, inner = "") => J(q).replace("（　）", `<span class="blank">${
 // the line under a gap: the answer with its key part underlined, or (for statements) the translation
 const ansLine = c => c.a.startsWith("(") ? `<div class="small muted">${esc(c.de)}</div>` : `<div class="q jp ans-line">— ${hl(c.a)}</div>`;
 const groupName = w => GROUPS.find(g => g.id === w.g).name;
-const TYPE_LABEL = { r: "Recall the word", c: "Fill the gap", p: "Ask for the underlined part", t: "Say it in Japanese", d: "Type what you hear" };
+const TYPE_LABEL = { r: "Recall the word", c: "Fill the gap", p: "Ask for the underlined part", t: "Say it in Japanese", d: "Type what you hear", x: "Build the whole sentence" };
 
 // ---------- dashboard ----------
+// What a round can consist of. "types" are the card types it draws from.
+const KINDS = [
+  { id: "mix", ico: "🎲", name: "Everything mixed", types: "cptxd", note: "all exercise types" },
+  { id: "full", ico: "🗣️", name: "Whole questions", types: "ptx", note: "hardest: type the full question" },
+  { id: "gap", ico: "✏️", name: "Gaps", types: "c", note: "type the missing question word" },
+  { id: "ear", ico: "👂", name: "Listening", types: "d", note: "type what you hear" },
+  { id: "word", ico: "🔤", name: "Single words", types: "r", note: "easiest: meaning → word" },
+];
+state.pref = Object.assign({ g: [], kind: "mix", n: 20 }, state.pref || {});
+const pref = state.pref;
+function pool(p = pref) {
+  const types = KINDS.find(k => k.id === p.kind).types;
+  return CARDS.filter(c => types.includes(c.type) && (!p.g.length || p.g.includes(c.w.g)) && (c.type !== "d" || canHear()));
+}
 function dash() {
-  const waiting = CARDS.filter(c => !srs[c.id] && "pt".includes(c.type) && box(`${c.w.id}:r`) >= 2).length;
-  const due = CARDS.filter(c => isDue(c.id)).length + Math.min(waiting, UNLOCK_PER_SESSION), fresh = QW.filter(w => !introduced(w)).length, b = belt();
-  const seen = CARDS.filter(c => srs[c.id]).length;
-  const nextDue = Math.min(...CARDS.filter(c => srs[c.id] && !isDue(c.id)).map(c => srs[c.id].due - today()), Infinity);
+  const due = CARDS.filter(c => isDue(c.id) && (c.type !== "d" || canHear())).length, b = belt();
+  const chip = (on, attr, label) => `<button class="pchip ${on ? "on" : ""}" ${attr}>${label}</button>`;
   app.innerHTML = `
-    <h2><span class="jp">しつもん{道場|どうじょう}</span> — Question Dojo</h2>`.replace(/\{([^|]+)\|([^}]+)\}/, "<ruby>$1<rt>$2</rt></ruby>") + `
-    <p class="sub">Every question word you can ask with — what, who, where, when, why, which, how much, how long. You type every answer from memory, and the dojo brings each card back just before you would forget it.</p>
-    <div class="card dojo-top">
-      <div class="belt"><span class="b-ico">${b.ico}</span><div><b>${b.name}</b><div class="small muted">${b.pct}% of cards strong${b.next ? ` · ${b.next[2]} at ${b.next[0]}%` : " · 🏆"}</div>
-        <div class="progress" style="width:180px"><div style="width:${b.pct}%"></div></div></div></div>
-      <div class="today">
-        ${due || fresh ? `<div class="big-n">${due}</div><div class="small muted">card${due === 1 ? "" : "s"} due${fresh ? ` · ${Math.min(fresh, NEW_PER_SESSION)} new word${Math.min(fresh, NEW_PER_SESSION) === 1 ? "" : "s"} ready` : ""}</div>
-          <a class="btn primary" href="#/session">${seen ? "Start today's training" : "Start — first 4 words"} →</a>`
-        : `<div class="big-n">✓</div><div class="small muted">All caught up.${isFinite(nextDue) ? ` Next cards in ${nextDue} day${nextDue === 1 ? "" : "s"}.` : ""}</div>`}
-      </div>
+    <h2><span class="jp">しつもん<ruby>道場<rt>どうじょう</rt></ruby></span> — Question Dojo</h2>
+    <p class="sub">Every question word, typed from memory. Nothing is locked: choose what you want to train and start.</p>
+    <div class="card stack">
+      <div><div class="plabel"><b>Topics</b><span>tap to combine</span></div>
+        <div class="row">${chip(!pref.g.length, `data-g=""`, "All")}${GROUPS.map(g => chip(pref.g.includes(g.id), `data-g="${g.id}"`, esc(g.name))).join("")}</div></div>
+      <div><div class="plabel"><b>Exercise</b><span id="knote"></span></div>
+        <div class="row">${KINDS.map(k => chip(pref.kind === k.id, `data-kind="${k.id}"`, `${k.ico} ${k.name}`)).join("")}</div></div>
+      <div><div class="plabel"><b>Cards</b><span id="pcount"></span></div>
+        <div class="row">${[10, 20, 40].map(n => chip(pref.n === n, `data-n="${n}"`, n)).join("")}</div></div>
+      <div class="row" style="justify-content:space-between"><a class="btn primary" href="#/session" id="start">Start round →</a>
+        ${due ? `<a class="btn" href="#/due">🔁 Review ${due} due card${due === 1 ? "" : "s"}</a>` : ""}</div>
     </div>
     <div class="path" style="margin-top:12px">
       <a class="tile" href="#/interview"><span class="ico">🎤</span><h4>Interview game <span class="stars">${starStr(state.stars.interview || 0)}</span></h4><p>Meet a stranger and find out twelve facts — by typing your own questions.</p></a>
       <a class="tile" href="#/map"><span class="ico">🗺️</span><h4>Question map</h4><p>The whole system on one page: こ-そ-あ-ど, なに vs なん, the particle rule.</p></a>
-      ${seen ? `<a class="tile" href="#/extra"><span class="ico">💪</span><h4>Weak spots</h4><p>Extra round with your 15 shakiest cards. Doesn't disturb the schedule.</p></a>` : ""}
     </div>
+    <div class="card" style="margin-top:12px"><div class="belt"><span class="b-ico">${b.ico}</span><div><b>${b.name}</b><div class="small muted">${b.pct}% of the sentence cards are strong${b.next ? ` · ${b.next[2]} at ${b.next[0]}%` : " · 🏆"}</div>
+      <div class="progress" style="width:180px"><div style="width:${b.pct}%"></div></div></div></div></div>
     ${GROUPS.map(g => `<h3>${g.name} <span class="small muted" style="font-weight:400">· ${g.sub}</span></h3><div class="qw-grid">${QW.filter(w => w.g === g.id).map(w => {
       const l = wordLevel(w);
-      return `<button class="qw ${l < 0 ? "new" : l >= 4 ? "gold" : l >= 2 ? "strong" : "learning"}" data-w="${w.id}"><span class="e">${l < 0 ? "🔒" : w.emo}</span><span><span class="k jp">${l < 0 ? "？" : J(w.kana)}</span><br><span class="m">${esc(mean(w))}</span></span></button>`;
+      return `<button class="qw ${l < 0 ? "" : l >= 4 ? "gold" : l >= 2 ? "strong" : "learning"}" data-w="${w.id}"><span class="e">${w.emo}</span><span><span class="k jp">${J(w.kana)}</span><br><span class="m">${esc(mean(w))}</span></span></button>`;
     }).join("")}</div>`).join("")}
     <div id="winfo"></div>
-    <p class="small muted" style="margin-top:20px">🔒 not learned yet · <span class="dot learning"></span> learning · <span class="dot strong"></span> strong · <span class="dot gold"></span> mastered. Progress is saved in this browser.
+    <p class="small muted" style="margin-top:20px">Tap a word for its tip and examples. <span class="dot learning"></span> shaky · <span class="dot strong"></span> strong · <span class="dot gold"></span> mastered. Progress is saved in this browser.
       <button class="back" id="reset">Reset progress</button></p>`;
+  const refresh = () => { const n = pool().length; $("#pcount").textContent = `${n} card${n === 1 ? "" : "s"} match`; $("#knote").textContent = KINDS.find(k => k.id === pref.kind).note; $("#start").classList.toggle("off", !n); };
+  refresh();
+  $$(".pchip").forEach(c => c.onclick = () => {
+    const d = c.dataset;
+    if ("g" in d) { if (!d.g) pref.g = []; else pref.g = pref.g.includes(d.g) ? pref.g.filter(x => x !== d.g) : [...pref.g, d.g]; }
+    if (d.kind) pref.kind = d.kind;
+    if (d.n) pref.n = +d.n;
+    save(); dash();
+  });
   $$(".qw").forEach(b => b.onclick = () => {
     const w = QW.find(x => x.id === b.dataset.w);
-    if (!introduced(w)) { toast("Locked — it comes up in training 🥋"); return; }
     $("#winfo").innerHTML = `<div class="card" style="margin-top:14px">${wordCard(w)}</div>`; $("#winfo").scrollIntoView({ behavior: "smooth", block: "nearest" }); speak(w.kana);
   });
   $("#reset").onclick = () => { if (confirm("Delete all Question Dojo progress?")) { localStorage.removeItem(KEY); location.reload(); } };
@@ -117,86 +130,57 @@ function wordCard(w) {
     ${(w.c || []).slice(0, 2).map(([q, a]) => { const full = q.replace("（　）", w.kana); return `<div class="ex">${spk(full)}<div class="t"><div class="ja">${J(q).replace("（　）", `<b class="hl-p">${J(w.kana)}</b>`)}</div>${a.startsWith("(") ? "" : `<div class="ja muted">— ${hl(a)}</div>`}</div></div>`; }).join("")}`;
 }
 
-// ---------- training session ----------
-const NEW_PER_SESSION = 4, MAX_DUE = 30;
-function buildSession(extra) {
-  unlock();
+// ---------- a round ----------
+// Order of preference inside the chosen pool: cards that are due, then cards never seen, then the rest — shakiest first.
+// Within each of those the order is random, and the same word never comes twice in a row.
+function buildRound(dueOnly) {
   let cards;
-  if (extra) cards = shuffle(CARDS.filter(c => srs[c.id] && (c.type !== "d" || canHear()))).sort((a, b) => srs[a.id].b - srs[b.id].b).slice(0, 15);
-  else cards = CARDS.filter(c => isDue(c.id) && (c.type !== "d" || canHear())).sort((a, b) => srs[a.id].b - srs[b.id].b).slice(0, MAX_DUE);
-  // interleave: shuffle, then avoid the same word twice in a row
+  if (dueOnly) cards = shuffle(CARDS.filter(c => isDue(c.id) && (c.type !== "d" || canHear()))).slice(0, 30);
+  else {
+    const rank = c => isDue(c.id) ? 0 : !srs[c.id] ? 1 : 2 + srs[c.id].b;
+    cards = shuffle(pool()).sort((a, b) => rank(a) - rank(b));
+    // the gap card and the whole-question card of one sentence shouldn't meet in one round
+    const seen = new Set(); cards = cards.filter(c => { const k = c.src || c.id; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, pref.n);
+  }
   cards = shuffle(cards);
   for (let i = 1; i < cards.length; i++) if (cards[i].w === cards[i - 1].w) { const j = cards.findIndex((c, k) => k > i && c.w !== cards[i - 1].w); if (j > 0) [cards[i], cards[j]] = [cards[j], cards[i]]; }
-  const queue = cards.map(card => ({ card, wasDue: !extra }));
-  if (!extra && cards.length < MAX_DUE) {
-    // new words: show → recall two cards later → gap cards further on
-    QW.filter(w => !introduced(w)).slice(0, NEW_PER_SESSION).forEach((w, n) => {
-      const at = Math.min(queue.length, n * 5);
-      const mine = CARDS.filter(c => c.w === w && (c.type === "r" || c.type === "c")).map(card => ({ card, wasDue: true, fresh: true }));
-      queue.splice(at, 0, { study: w });
-      queue.splice(Math.min(queue.length, at + 2), 0, mine[0]);
-      mine.slice(1).forEach((m, k) => queue.splice(Math.min(queue.length, at + 5 + k * 3), 0, m));
-    });
-  }
-  return queue;
+  return cards.map(card => ({ card, wasDue: !srs[card.id] || isDue(card.id) }));   // only a new or due card can move up a box
 }
-function session(extra = false) {
-  const queue = buildSession(extra);
-  if (!queue.length) { app.innerHTML = `${backBtn}<div class="card stack" style="text-align:center"><div class="result-big">✓</div><p>Nothing to train right now. Try the interview game, or come back tomorrow.</p><div class="row" style="justify-content:center"><a class="btn primary" href="#/interview">🎤 Interview game</a></div></div>`; return; }
-  const total = queue.length; let i = 0, firstTry = 0, answered = 0, learned = 0;
-  const next = () => { i++; show(); };
+function session(dueOnly = false) {
+  const queue = buildRound(dueOnly);
+  if (!queue.length) { app.innerHTML = `${backBtn}<div class="card stack" style="text-align:center"><div class="result-big">∅</div><p>No cards match this choice${pref.kind === "ear" ? " (listening needs sound switched on)" : ""}. Change the topics or the exercise.</p><div class="row" style="justify-content:center"><a class="btn primary" href="#/">Back to the dojo</a></div></div>`; return; }
+  let i = 0, firstTry = 0, answered = 0;
+  const label = dueOnly ? "🔁 Due cards" : `${KINDS.find(k => k.id === pref.kind).ico} ${KINDS.find(k => k.id === pref.kind).name}`;
   const show = () => {
     if (i >= queue.length) return finish();
     const it = queue[i];
-    const head = `${backBtn}<div class="plabel"><span>${extra ? "💪 Weak spots" : "🥋 Training"} · ${Math.min(i + 1, queue.length)} / ${queue.length}</span><span>✓ ${firstTry}</span></div><div class="progress"><div style="width:${i / queue.length * 100}%"></div></div>`;
-    if (it.study) return study(it.study, head, () => { learned++; next(); });
+    const head = `${backBtn}<div class="plabel"><span>${label} · ${i + 1} / ${queue.length}</span><span>✓ ${firstTry}</span></div><div class="progress"><div style="width:${i / queue.length * 100}%"></div></div>`;
     ask(it, head, (ok, hinted) => {
-      if (!it.retry) { answered++; if (ok && !hinted) firstTry++; grade(it.card, ok, hinted, it.wasDue); if (ok) addXP(it.card.type === "r" || it.card.type === "c" ? 5 : 10); }
-      else if (ok) { srs[it.card.id].b = 1; srs[it.card.id].due = today() + 1; save(); addXP(2); }   // got it on the comeback → see it again tomorrow
+      if (!it.retry) { answered++; if (ok && !hinted) firstTry++; grade(it.card, ok, hinted, it.wasDue); if (ok) addXP("rc".includes(it.card.type) ? 5 : 10); }
+      else if (ok) { srs[it.card.id].b = 1; srs[it.card.id].due = today() + 1; save(); addXP(2); }   // got it on the comeback → due again tomorrow
       if (!ok) queue.splice(Math.min(queue.length, i + 4), 0, { card: it.card, retry: true });      // missed → comes back a few cards later
-      next();
+      i++; show();
     });
   };
   const finish = () => {
     const pct = answered ? Math.round(firstTry / answered * 100) : 100, b = belt();
-    const tomorrow = CARDS.filter(c => srs[c.id] && srs[c.id].due <= today() + 1).length;
-    const dueNow = CARDS.filter(c => isDue(c.id)).length + CARDS.filter(c => !srs[c.id] && "pt".includes(c.type) && box(`${c.w.id}:r`) >= 2).length;
-    const fresh = QW.filter(w => !introduced(w)).length;
-    setStars(extra ? "extra" : "session", pct >= 90 ? 3 : pct >= 70 ? 2 : 1);
+    const dueNow = CARDS.filter(c => isDue(c.id) && (c.type !== "d" || canHear())).length;
+    setStars("session", pct >= 90 ? 3 : pct >= 70 ? 2 : 1);
     app.innerHTML = `${backBtn}<div class="card stack" style="text-align:center"><div class="result-big">${pct >= 90 ? "🥋✨" : "🥋"} ${firstTry}/${answered}</div>
-      <p>right on the first try, without hints (${pct}%).${learned ? ` ${learned} new word${learned === 1 ? "" : "s"} learned.` : ""}</p>
-      <p>${b.ico} <b>${b.name}</b> · ${b.pct}% of cards strong</p>
-      <p class="small muted">${dueNow ? `${dueNow} card${dueNow === 1 ? " is" : "s are"} due again now.` : `Tomorrow ${tomorrow} card${tomorrow === 1 ? " is" : "s are"} waiting — short daily visits beat one long one.`}</p>
-      <div class="row" style="justify-content:center">${dueNow || fresh ? `<button class="btn primary" onclick="route()">${dueNow ? "Keep going" : `Learn ${Math.min(fresh, NEW_PER_SESSION)} more word${Math.min(fresh, NEW_PER_SESSION) === 1 ? "" : "s"}`}</button>` : ""}
-        <a class="btn" href="#/interview">🎤 Interview game</a><a class="btn" href="#/">Dojo</a></div></div>`;
+      <p>right on the first try, without hints (${pct}%).</p>
+      <p>${b.ico} <b>${b.name}</b> · ${b.pct}% of the sentence cards strong</p>
+      <div class="row" style="justify-content:center"><button class="btn primary" onclick="route()">Another round</button>
+        ${dueNow && !dueOnly ? `<a class="btn" href="#/due">🔁 ${dueNow} due</a>` : ""}<a class="btn" href="#/">Change what I train</a></div></div>`;
     if (pct >= 90 && answered >= 5) confetti();
   };
   show();
-}
-
-// New word: see it, hear it, and type it once before the first test.
-function study(w, head, done) {
-  keyHandler = null;
-  app.innerHTML = `${head}<div class="card stack"><span class="badge new">New · ${esc(groupName(w))}</span>${wordCard(w)}
-    <label class="small muted">Type it once to continue</label>
-    <input class="type-in" id="in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${esc(kanaToRomaji(w.kana))} → ${esc(w.kana)}">
-    <div id="fb"></div></div>`;
-  for (const c of CARDS) if (c.w === w && (c.type === "r" || c.type === "c") && !srs[c.id]) srs[c.id] = { b: 0, due: today() };
-  save(); speak(w.kana);
-  const inp = $("#in"); liveKana(inp); inp.focus();
-  inp.onkeydown = e => {
-    if (e.key !== "Enter") return;
-    inp.value = finishKana(inp.value);
-    if ([w.kana, ...(w.alt || [])].some(a => key(a) === key(inp.value))) done();
-    else { inp.classList.add("shake"); setTimeout(() => inp.classList.remove("shake"), 400); $("#fb").innerHTML = `<div class="small muted">Type <b class="jp">${esc(w.kana)}</b> (${esc(kanaToRomaji(w.kana))}), then Enter.</div>`; }
-  };
 }
 
 // One card. done(ok, hinted) is called once the learner moves on.
 function ask({ card, retry }, head, doneOnce) {
   keyHandler = null;
   let fired = false; const done = (ok, h) => { if (fired) return; fired = true; doneOnce(ok, h); };
-  const w = card.w, t = card.type, sentence = "ptd".includes(t);
+  const w = card.w, t = card.type, sentence = "ptdx".includes(t);
   app.dataset.card = card.id;
   let hinted = false, state_ = "open";
   const prompt = {
@@ -204,25 +188,26 @@ function ask({ card, retry }, head, doneOnce) {
     c: () => `<div class="q jp">${gap(card.q)}</div>${ansLine(card)}`,
     p: () => `<div class="q jp ans-line">${hl(card.a)}</div><p class="small muted" style="margin:0">What was the question?</p>`,
     t: () => `<div style="text-align:center;font-size:20px;margin:10px 0"><b>${esc(mean(card))}</b></div>`,
+    x: () => `<div style="text-align:center;font-size:19px;margin:8px 0"><b>${esc(card.deQ)}</b></div>${card.a.startsWith("(") ? "" : `<div class="q jp ans-line" style="margin-top:0">— ${hl(card.a)}</div>`}`,
     d: () => `<div style="text-align:center;margin:8px 0"><button class="btn" id="again">🔊 Play again</button> <button class="btn" id="slow">🐢 Slower</button></div>`,
   }[t]();
   app.innerHTML = `${head}<div class="card stack"><div class="row" style="justify-content:space-between"><span class="badge">${TYPE_LABEL[t]}${retry ? " · again" : ""}</span>${w.g === "polite" && t !== "r" ? `<span class="badge new">polite</span>` : ""}</div>
     ${prompt}
-    <input class="type-in" id="in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${sentence ? "type the whole question" : "type the question word"}">
+    <input class="type-in" id="in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${sentence ? "type the whole sentence" : "type the question word"}">
     <div class="row" style="justify-content:space-between"><button class="btn" id="hint">💡 Hint</button><button class="btn primary" id="go">Check</button></div><div id="fb"></div></div>`;
   const inp = $("#in"); liveKana(inp); inp.focus();
   if (t === "d") { speak(card.full); $("#again").onclick = () => { speak(card.full); inp.focus(); }; $("#slow").onclick = () => { speak(card.full, 0.6); inp.focus(); }; }
-  const model = t === "c" ? card.q.replace("（　）", w.kana) : t === "r" ? w.kana : t === "d" ? card.full : card.accept[0] + "。";
+  const model = t === "c" ? card.q.replace("（　）", w.kana) : t === "r" ? w.kana : t === "d" ? card.full : t === "x" ? card.accept[0] : card.accept[0] + "。";
   $("#hint").onclick = () => {
     hinted = true;
-    const h = t === "c" ? `💬 ${esc(card.de)}` : t === "p" ? `💬 ${esc(card.de)}` : t === "t" ? `Question word: <b class="jp">${esc(w.kana)}</b>` : t === "d" ? `💬 ${esc(card.de)}` : `Starts with <b class="jp">${esc([...w.kana][0])}</b> · ${[...w.kana].length} kana`;
+    const h = t === "c" ? `💬 ${esc(card.de)}` : t === "p" ? `💬 ${esc(card.de)}` : t === "t" || t === "x" ? `Question word: <b class="jp">${esc(w.kana)}</b>` : t === "d" ? `💬 ${esc(card.de)}` : `Starts with <b class="jp">${esc([...w.kana][0])}</b> · ${[...w.kana].length} kana`;
     $("#fb").innerHTML = `<div class="small muted">${h}</div>`; inp.focus();
   };
   const settle = ok => {
     state_ = "done"; inp.disabled = true; $("#hint").style.display = "none";
     beep(ok);
     const after = t === "c" ? `<div class="row">${spk(model)}<span class="ja jp">${J(card.q).replace("（　）", `<b class="hl-p">${J(w.kana)}</b>`)}</span></div>${card.a.startsWith("(") ? "" : `<div class="ja jp muted">— ${hl(card.a)}</div>`}<div class="small muted">${esc(card.de)}</div>`
-      : `<div class="row">${spk(model)}<span class="ja jp" style="font-size:20px">${J(model)}</span></div>${card.de && t !== "t" ? `<div class="small muted">${esc(card.de)}</div>` : ""}`;
+      : `<div class="row">${spk(model)}<span class="ja jp" style="font-size:20px">${J(model)}</span></div>${card.de && t !== "t" && t !== "x" ? `<div class="small muted">${esc(card.de)}</div>` : ""}`;
     const others = sentence && card.accept.length > 1 ? `<div class="small muted">Also fine: ${card.accept.slice(1).map(a => `<span class="jp">${J(a)}</span>`).join(" · ")}</div>` : "";
     if (ok) {
       $("#fb").innerHTML = `<div class="fb ok"><div class="h">せいかい！ ✓${hinted ? " (with hint — it comes back sooner)" : ""}</div>${after}${others}<div class="small" style="margin-top:6px">💡 ${w.tip}</div></div>`;
@@ -333,13 +318,13 @@ function map() {
     ${ex("あした いきますか。 —— はい、いきます。／ いいえ、いきません。", "Yes/no question: just add か.")}
     ${ex("それは ペンですか、えんぴつですか。 —— えんぴつです。", "Either/or: two questions in a row. Answer with the right one, not はい/いいえ.")}
     ${ex("いっしょに いきませんか。 —— ええ、いいですね。", "Invitation: ～ませんか (won't you …?).")}</div>
-  <div class="row center" style="justify-content:center"><a class="btn primary" href="#/session">🥋 To the training →</a></div></div>`;
+  <div class="row center" style="justify-content:center"><a class="btn primary" href="#/">🥋 To the dojo →</a></div></div>`;
 }
 
 // ---------- routes ----------
 const MODES = [
-  { id: "session", fn: () => session(false), t: "Training" },
-  { id: "extra", fn: () => session(true), t: "Weak spots" },
+  { id: "session", fn: () => session(false), t: "Round" },
+  { id: "due", fn: () => session(true), t: "Due cards" },
   { id: "interview", fn: () => interview(), t: "Interview game" },
   { id: "map", fn: () => map(), t: "Question map" },
 ];
