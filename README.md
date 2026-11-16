@@ -53,12 +53,23 @@ All the question words (なに, だれ, どこ, いつ, どうして, どれ, �
 
 Append `?day=3` to the URL to pretend it is three days later (useful for testing the schedule).
 
+## 「に」道場 — the three jobs of に (`ni/`)
+
+The particle に as a point in time (10じに ねます), as the person an action goes to (ともだちに でんわを かけます) and as the person it comes from (せんせいに ならいます). Sentences are generated from small scenes (who, to whom, what, when), so rounds do not repeat.
+
+- **Open choice.** Pick the focus (time / to someone / from someone / all), the exercise and the length. The verb can be shown or hidden.
+- **Five typed exercises.** Picture → sentence · switch the view (かします ⇄ かります) · particles (に against は・を・で・と・へ, or nothing) · fix the mistake · answer the question.
+- **Targeted feedback.** A wrong sentence is analysed: particle after the person, に after きのう, missing に after a clock time, wrong direction of the verb, wrong tense.
+- **Adaptive and spaced.** Verbs you miss are drawn more often, a missed pattern returns in the same round with a new scene, and each verb comes due again after 1, 3, 7, 14 and 30 days.
+- **Sort the verbs** is the worksheet's first task; the **に map** has the rules and the worksheet solution.
+
 ## Code layout
 
 - `assets/core.js`: the shared engine (progress, audio, romaji → kana typing, kanji with furigana, flashcards, sentence builder, memory, typing, multiple choice, router).
 - `assets/style.css`: shared styles.
 - `lessonNN/data.js`: the lesson's content and its `LESSON` settings.
 - `lessonNN/app.js`: the lesson's path (`MODES`) and its own games. It ends with `boot()`.
+- `ni/`: the に Dojo, with its own scene generator.
 - `questions/`: the Question Dojo. It uses the shared helpers but has its own dashboard and scheduler.
 
 ## Run locally

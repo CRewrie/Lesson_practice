@@ -309,3 +309,24 @@ u.focus { text-decoration: none; background: var(--warn-soft); border-bottom: 2p
 .pchip { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 99px; padding: 7px 13px; font-size: 14px; cursor: pointer; }
 .pchip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .btn.off { opacity: .4; pointer-events: none; }
+
+/* に dojo */
+.dia { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 8px 0; }
+.who { display: grid; justify-items: center; gap: 2px; padding: 8px 10px; border-radius: 12px; border: 2px solid transparent; position: relative; min-width: 84px; }
+.who .we { font-size: 40px; line-height: 1.1; }
+.who .wk { font-size: 15px; }
+.who.subj { border-color: var(--accent); background: var(--accent-soft); }
+.who .wtag { position: absolute; top: -11px; right: -8px; background: var(--accent); color: #fff; border-radius: 99px; font-size: 12px; padding: 0 7px; }
+.arrow { display: grid; justify-items: center; line-height: 1.15; min-width: 70px; }
+.arrow .thing { font-size: 30px; }
+.arrow .line { font-size: 26px; color: var(--muted); }
+.arrow .clock { font-size: 30px; font-weight: 700; white-space: nowrap; }
+.q.wrong-line { color: var(--bad); text-align: center; font-size: 19px; }
+ul.diag { margin: 8px 0 0; padding-left: 18px; font-size: 14px; }
+.gapline { font-size: 20px; line-height: 2.6; }
+.gapline .gw { margin-left: 6px; }
+.gp-in { width: 3.2em; font: 20px var(--jp); text-align: center; padding: 4px 2px; margin: 0 2px; border-radius: 8px; border: 2px solid var(--line); background: var(--bg); color: var(--accent); }
+.gp-in:focus { outline: none; border-color: var(--accent); }
+.gp-in.ok { border-color: var(--good); background: var(--good-soft); color: var(--good); }
+.gp-in.no { border-color: var(--bad); background: var(--bad-soft); color: var(--bad); text-decoration: line-through; }
+.gfix { color: var(--good); font-weight: 700; margin-right: 4px; }
