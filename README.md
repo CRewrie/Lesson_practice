@@ -72,6 +72,12 @@ The particle に as a point in time (10じに ねます), as the person an actio
 - `ni/`: the に Dojo, with its own scene generator.
 - `questions/`: the Question Dojo. It uses the shared helpers but has its own dashboard and scheduler.
 
+## Voices
+
+By default the lessons speak with the browser's Japanese voice. Under **🗣️ voice** at the top of every lesson you can store your own Google Cloud Text-to-Speech API key and pick one of Google's voices. The key and the choice are kept only in that browser (`localStorage`) and are sent only to Google. Each sentence is fetched once and then kept on the device. If a request fails, the browser voice is used instead.
+
+Restrict the key in the Google Cloud Console to the Cloud Text-to-Speech API and to this site's address.
+
 ## Run locally
 
 ```sh

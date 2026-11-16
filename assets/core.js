@@ -114,17 +114,94 @@ function sentRomaji(tokens) {
 }
 
 // ---------- speech ----------
+// Two sources: the browser's own Japanese voice, or Google Cloud Text-to-Speech when the learner has stored
+// their own API key under "🗣️ voice". The key and the chosen voice live only in this browser (localStorage,
+// shared by all lessons on this site). Audio that was fetched once is kept on the device and not fetched again.
 let jaVoice = null;
 function loadVoice() { const vs = speechSynthesis.getVoices(); jaVoice = vs.find(v => v.lang === "ja-JP" && /Kyoko|O-Ren|Google|Nanami/i.test(v.name)) || vs.find(v => v.lang && v.lang.startsWith("ja")) || null; }
 if ("speechSynthesis" in window) { loadVoice(); speechSynthesis.onvoiceschanged = loadVoice; }
-function speak(text, rate = 0.85) {
-  if (!("speechSynthesis" in window) || !state.sound) return;
-  const t = plain(text).replace(/[\[\]～]/g, "").replace(/ATM/g, "エーティーエム");
+const TTS_KEY = "tts.v1", TTS_URL = "https://texttospeech.googleapis.com/v1/";
+const tts = Object.assign({ key: "", voice: "ja-JP-Chirp3-HD-Aoede" }, (() => { try { return JSON.parse(localStorage.getItem(TTS_KEY)) || {}; } catch (_) { return {}; } })());
+const saveTts = () => { try { localStorage.setItem(TTS_KEY, JSON.stringify(tts)); } catch (_) {} };
+const canSpeak = () => !!tts.key || "speechSynthesis" in window;
+// One audio element for everything. iOS only lets a page start audio after a touch, so the first touch "unlocks" it.
+const player = new Audio(); let unlocked = false, speakSeq = 0;
+const SILENCE = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+document.addEventListener("pointerdown", () => { if (unlocked || !tts.key) return; unlocked = true; player.src = SILENCE; player.play().catch(() => {}); }, true);
+const ttsMem = new Map();
+async function ttsAudio(text) {
+  const id = tts.voice + "|" + text;
+  if (ttsMem.has(id)) return ttsMem.get(id);
+  const req = "https://tts.cache/" + encodeURIComponent(id);
+  let cache = null; try { cache = await caches.open("tts-v1"); const hit = await cache.match(req); if (hit) { const u = URL.createObjectURL(await hit.blob()); ttsMem.set(id, u); return u; } } catch (_) {}
+  const r = await fetch(TTS_URL + "text:synthesize?key=" + encodeURIComponent(tts.key), { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input: { text }, voice: { languageCode: "ja-JP", name: tts.voice }, audioConfig: { audioEncoding: "MP3" } }) });
+  const j = await r.json();
+  if (!r.ok || !j.audioContent) throw new Error(j.error?.message || "Text-to-Speech request failed");
+  const bytes = Uint8Array.from(atob(j.audioContent), c => c.charCodeAt(0)), blob = new Blob([bytes], { type: "audio/mpeg" });
+  try { if (cache) await cache.put(req, new Response(blob)); } catch (_) {}
+  const u = URL.createObjectURL(blob); ttsMem.set(id, u); return u;
+}
+function browserSpeak(t, rate) {
+  if (!("speechSynthesis" in window)) return;
   speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(t);
   u.lang = "ja-JP"; u.rate = rate; if (jaVoice) u.voice = jaVoice;
   speechSynthesis.speak(u);
 }
+function stopSpeaking() { speakSeq++; try { player.pause(); } catch (_) {} if ("speechSynthesis" in window) speechSynthesis.cancel(); }
+function speak(text, rate = 0.85) {
+  if (!state.sound) return;
+  const t = plain(text).replace(/[\[\]～]/g, "").replace(/ATM/g, "エーティーエム").trim();
+  if (!t) return;
+  if (!tts.key) return browserSpeak(t, rate);
+  const mine = ++speakSeq;                                   // a newer speak() or a page change cancels this one
+  ttsAudio(t).then(url => {
+    if (mine !== speakSeq) return;
+    player.src = url; player.playbackRate = rate < 0.8 ? 0.75 : rate > 0.95 ? 1 : 0.92;   // natural voices need less slowing than the robot voice
+    return player.play();
+  }).catch(err => { if (mine === speakSeq) { ttsProblem(err); browserSpeak(t, rate); } });
+}
+let ttsWarned = false;
+function ttsProblem(err) { if (ttsWarned) return; ttsWarned = true; toast("Google voice failed — using the browser voice"); console.warn("TTS:", err && err.message); }
+
+// The "🗣️ voice" dialog: store or remove the key, pick a voice, test it.
+function voiceDialog() {
+  document.querySelector(".modal")?.remove();
+  const m = document.createElement("div"); m.className = "modal";
+  m.innerHTML = `<div class="card stack modal-box"><div class="row" style="justify-content:space-between"><b>🗣️ Voice</b><button class="back" id="vx">✕ close</button></div>
+    <p class="small muted" style="margin:0">Without a key the lessons use your browser's Japanese voice. With your own <b>Google Cloud Text-to-Speech</b> API key they use Google's natural voices.
+      The key is stored only in this browser and sent only to Google. Each new sentence is fetched once and then kept on this device.</p>
+    <label class="small">API key<input class="type-in" id="vkey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="AIza…" style="font:15px var(--ui);margin-top:4px"></label>
+    <label class="small">Voice<select id="vsel" class="type-in" style="font:15px var(--ui);margin-top:4px"><option>${esc(tts.voice)}</option></select></label>
+    <div class="row"><button class="btn primary" id="vsave">Save & test</button><button class="btn" id="vtest">🔊 Test</button><button class="btn" id="vdel">Remove key</button></div>
+    <div id="vmsg" class="small"></div>
+    <details class="small muted"><summary>Keep the key safe</summary>In the Google Cloud Console, restrict the key to the <b>Cloud Text-to-Speech API</b> and to the website <b>${esc(location.origin)}/*</b>. Then it is useless anywhere else.</details></div>`;
+  document.body.appendChild(m);
+  const q = sel => m.querySelector(sel), msg = (t, bad) => { q("#vmsg").innerHTML = `<span style="color:var(--${bad ? "bad" : "good"})">${t}</span>`; };
+  q("#vkey").value = tts.key;
+  const loadVoices = async () => {
+    if (!q("#vkey").value.trim()) return false;
+    const r = await fetch(TTS_URL + "voices?languageCode=ja-JP&key=" + encodeURIComponent(q("#vkey").value.trim())), j = await r.json();
+    if (!r.ok) throw new Error(j.error?.message || "Request failed");
+    const rank = n => /Chirp3-HD/.test(n) ? 0 : /Neural2/.test(n) ? 1 : /Wavenet/.test(n) ? 2 : 3;
+    const vs = (j.voices || []).sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
+    q("#vsel").innerHTML = vs.map(v => `<option value="${esc(v.name)}" ${v.name === tts.voice ? "selected" : ""}>${esc(v.name.replace("ja-JP-", ""))} · ${v.ssmlGender === "FEMALE" ? "♀" : v.ssmlGender === "MALE" ? "♂" : ""}</option>`).join("");
+    if (!vs.some(v => v.name === tts.voice) && vs[0]) q("#vsel").value = vs[0].name;
+    return true;
+  };
+  const apply = () => { tts.key = q("#vkey").value.trim(); tts.voice = q("#vsel").value || tts.voice; saveTts(); ttsWarned = false; unlocked = true; };
+  const test = () => { apply(); const was = state.sound; state.sound = true; speak("こんにちは。これは テストです。", 1); state.sound = was; };
+  q("#vx").onclick = () => m.remove(); m.onclick = e => { if (e.target === m) m.remove(); };
+  q("#vsave").onclick = async () => {
+    try { if (!(await loadVoices())) return msg("Paste your API key first.", true); apply(); msg("Key works ✓ — pick a voice and press Test."); test(); drawTop(); }
+    catch (e) { msg("Google says: " + esc(e.message), true); }
+  };
+  q("#vtest").onclick = test; q("#vsel").onchange = test;
+  q("#vdel").onclick = () => { tts.key = ""; saveTts(); q("#vkey").value = ""; msg("Key removed. The browser voice is used again."); drawTop(); };
+  if (tts.key) loadVoices().catch(e => msg("Google says: " + esc(e.message), true));
+}
+document.addEventListener("click", e => { if (e.target.closest("[data-voice]")) voiceDialog(); });
 const spk = text => `<button class="speak" data-say="${esc(plain(text))}" title="Listen" aria-label="Listen">🔊</button>`;
 document.addEventListener("click", e => { const b = e.target.closest("[data-say]"); if (b) { e.stopPropagation(); speak(b.dataset.say); } });
 
@@ -172,7 +249,8 @@ function drawTop() {
   $("#settings").innerHTML = [
     ["furi", "ふりがな"], ["romaji", "romaji"], ["labels", "labels"], ["sound", "🔊 sound"],
   ].map(([k, l]) => `<span class="chip ${state[k] ? "on" : ""}" data-set="${k}">${l}</span>`).join("") +
-    `<span class="chip on" data-set="lang">${state.lang === "de" ? "🇩🇪 DE" : "🇬🇧 EN"}</span>`;
+    `<span class="chip on" data-set="lang">${state.lang === "de" ? "🇩🇪 DE" : "🇬🇧 EN"}</span>` +
+    `<span class="chip ${tts.key ? "on" : ""}" data-voice="1">🗣️ voice${tts.key ? ": Google" : ""}</span>`;
 }
 document.addEventListener("click", e => {
   const c = e.target.closest("[data-set]"); if (!c) return;
@@ -442,7 +520,7 @@ document.addEventListener("keydown", e => { if (e.target.matches("input, textare
 const ROUTES = { "": home };
 function route() {
   keyHandler = null; timers.splice(0).forEach(clearInterval);
-  if ("speechSynthesis" in window) speechSynthesis.cancel();
+  stopSpeaking();
   const r = location.hash.replace(/^#\/?/, "");
   (ROUTES[r] || home)();
   window.scrollTo(0, 0);

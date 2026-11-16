@@ -239,7 +239,7 @@ const CAFE = [{ k: "サンドイッチ", e: "🥪" }, { k: "カレー", e: "🍛
 const POST = [{ k: "きって", e: STAMP }, { k: "はがき", e: POSTCARD }, { k: "ふうとう", e: "✉️" }];
 function orderUp() {
   const N = 6; let i = 0, right = 0;
-  const canHear = "speechSynthesis" in window;
+  const canHear = canSpeak();
   const round = () => {
     if (i >= N) { addXP(right * 6); return done("🥪", right, N, right >= 6 ? 3 : right >= 4 ? 2 : 1, "order"); }
     const post = i % 2 === 1, menu = post ? POST : CAFE, c = post ? "mai" : "tsu";

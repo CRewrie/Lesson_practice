@@ -38,7 +38,7 @@ const srs = state.srs;
 // Compare answers loosely: spaces and punctuation don't count, and the particles を・は・へ may be typed the way
 // they sound (o, wa, e) — so "kore wa nan desu ka" is accepted for これは なんですか.
 const key = s => unLong(norm(s)).replace(/を/g, "お").replace(/は/g, "わ").replace(/へ/g, "え");
-const canHear = () => "speechSynthesis" in window && state.sound;
+const canHear = () => canSpeak() && state.sound;
 const box = id => srs[id]?.b ?? -1;
 const isDue = id => srs[id] && srs[id].due <= today();
 function grade(card, ok, hinted, wasDue) {
