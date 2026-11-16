@@ -77,3 +77,61 @@ for (const [stem, k] of [["ね", "{寝|ね}"], ["おき", "{起|お}き"], ["お
 // settings read by the shared engine
 const VOCAB = [];
 const LESSON = { key: "ni.v1", name: "に Dojo", title: "「に」道場", sub: "", confetti: ["🎉", "✨", "🎁", "📞", "⏰", "⭐"], memoryGroups: {}, builderExtra: () => [], whyWrong: () => "" };
+
+// ----- translations of generated sentences -----
+// People: German nominative / dative / accusative / "von …", English subject / object form.
+const WHO_TR = {
+  "わたし": { n: "Ich", d: "mir", a: "mich", v: "von mir", s: "I", o: "me" },
+  "ともだち": { n: "Mein Freund", d: "meinem Freund", a: "meinen Freund", v: "von meinem Freund", s: "My friend", o: "my friend" },
+  "せんせい": { n: "Der Lehrer", d: "dem Lehrer", a: "den Lehrer", v: "vom Lehrer", s: "The teacher", o: "the teacher" },
+  "ちち": { n: "Mein Vater", d: "meinem Vater", a: "meinen Vater", v: "von meinem Vater", s: "My father", o: "my father" },
+  "はは": { n: "Meine Mutter", d: "meiner Mutter", a: "meine Mutter", v: "von meiner Mutter", s: "My mother", o: "my mother" },
+  "あに": { n: "Mein älterer Bruder", d: "meinem älteren Bruder", a: "meinen älteren Bruder", v: "von meinem älteren Bruder", s: "My older brother", o: "my older brother" },
+  "あね": { n: "Meine ältere Schwester", d: "meiner älteren Schwester", a: "meine ältere Schwester", v: "von meiner älteren Schwester", s: "My older sister", o: "my older sister" },
+  "いもうと": { n: "Meine jüngere Schwester", d: "meiner jüngeren Schwester", a: "meine jüngere Schwester", v: "von meiner jüngeren Schwester", s: "My younger sister", o: "my younger sister" },
+  "かれ": { n: "Er", d: "ihm", a: "ihn", v: "von ihm", s: "He", o: "him" },
+  "かのじょ": { n: "Sie", d: "ihr", a: "sie", v: "von ihr", s: "She", o: "her" },
+  "かぞく": { n: "Meine Familie", d: "meiner Familie", a: "meine Familie", v: "von meiner Familie", s: "My family", o: "my family" },
+  "ミラーさん": { n: "Herr Miller", d: "Herrn Miller", a: "Herrn Miller", v: "von Herrn Miller", s: "Mr Miller", o: "Mr Miller" },
+  "たなかさん": { n: "Herr Tanaka", d: "Herrn Tanaka", a: "Herrn Tanaka", v: "von Herrn Tanaka", s: "Mr Tanaka", o: "Mr Tanaka" },
+  "やまださん": { n: "Frau Yamada", d: "Frau Yamada", a: "Frau Yamada", v: "von Frau Yamada", s: "Ms Yamada", o: "Ms Yamada" },
+  "カリナさん": { n: "Karina", d: "Karina", a: "Karina", v: "von Karina", s: "Karina", o: "Karina" },
+  "かいぎ": { n: "Die Besprechung", s: "The meeting" }, "しごと": { n: "Die Arbeit", s: "Work" }, "じゅぎょう": { n: "Der Unterricht", s: "The class" },
+  "えいが": { n: "Der Film", s: "The film" }, "パーティー": { n: "Die Party", s: "The party" }, "しけん": { n: "Die Prüfung", s: "The exam" },
+};
+const THING_TR = {
+  "はな": ["Blumen", "flowers"], "プレゼント": ["ein Geschenk", "a present"], "チョコレート": ["Schokolade", "chocolate"], "ほん": ["ein Buch", "a book"], "とけい": ["eine Uhr", "a watch"],
+  "シャツ": ["ein Hemd", "a shirt"], "ネクタイ": ["eine Krawatte", "a tie"], "おかね": ["Geld", "money"], "カード": ["eine Karte", "a card"], "かさ": ["einen Schirm", "an umbrella"],
+  "じしょ": ["ein Wörterbuch", "a dictionary"], "じてんしゃ": ["ein Fahrrad", "a bicycle"], "ペン": ["einen Stift", "a pen"], "くるま": ["ein Auto", "a car"],
+  "にほんご": ["Japanisch", "Japanese"], "えいご": ["Englisch", "English"], "ちゅうごくご": ["Chinesisch", "Chinese"], "かんじ": ["Kanji", "kanji"], "ピアノ": ["Klavier", "the piano"], "ギター": ["Gitarre", "the guitar"],
+  "てがみ": ["einen Brief", "a letter"], "にもつ": ["ein Paket", "a parcel"], "しゃしん": ["ein Foto", "a photo"], "メール": ["eine E-Mail", "an e-mail"], "でんわ": ["", ""],
+};
+const TW_TR = { "きのう": ["gestern", "yesterday"], "せんしゅう": ["letzte Woche", "last week"], "あした": ["morgen", "tomorrow"], "らいしゅう": ["nächste Woche", "next week"], "まいばん": ["jeden Abend", "every night"],
+  "こんばん": ["heute Abend", "tonight"], "まいあさ": ["jeden Morgen", "every morning"], "けさ": ["heute Morgen", "this morning"], "きょう": ["heute", "today"], "まいにち": ["jeden Tag", "every day"] };
+// German: [ich-form, er/sie-form, participle, separable prefix, how the other person appears: d dative · a accusative · v "von …"]
+// English: [base, he/she-form, past, preposition before the other person]
+const VERB_TR = {
+  age: { de: ["gebe", "gibt", "gegeben", "", "d"], en: ["give", "gives", "gave", "to"] },
+  kashi: { de: ["leihe", "leiht", "geliehen", "", "d"], en: ["lend", "lends", "lent", "to"] },
+  okuri: { de: ["schicke", "schickt", "geschickt", "", "d"], en: ["send", "sends", "sent", "to"] },
+  oshie: { de: ["bringe", "bringt", "beigebracht", "bei", "d"], en: ["teach", "teaches", "taught", "to"] },
+  kake: { de: ["rufe", "ruft", "angerufen", "an", "a"], en: ["call", "calls", "called", ""] },
+  morai: { de: ["bekomme", "bekommt", "bekommen", "", "v"], en: ["get", "gets", "got", "from"] },
+  kari: { de: ["leihe", "leiht", "geliehen", "", "v"], refl: true, en: ["borrow", "borrows", "borrowed", "from"] },
+  narai: { de: ["lerne", "lernt", "gelernt", "", "v"], en: ["learn", "learns", "learned", "from"] },
+};
+// translations for the hand-written particle sentences, in the order of MIXED
+const MIXED_TR = [
+  ["Ich habe mit einem Freund einen Film gesehen.", "I watched a film with a friend."],
+  ["Ich esse mit Stäbchen.", "I eat with chopsticks."],
+  ["Ich treffe morgen einen Freund.", "I'm meeting a friend tomorrow."],
+  ["Ich schreibe einen Brief auf Japanisch.", "I write a letter in Japanese."],
+  ["Ich fahre nächste Woche nach Kyoto.", "I'm going to Kyoto next week."],
+  ["Herr Miller arbeitet von neun bis fünf Uhr.", "Mr Miller works from nine to five."],
+  ["Ich habe im Konbini Brot gekauft.", "I bought bread at the convenience store."],
+  ["Ich fahre mit dem Bus zur Firma.", "I go to work by bus."],
+  ["Ich habe gestern einem Freund eine E-Mail auf Japanisch geschickt.", "Yesterday I sent a friend an e-mail in Japanese."],
+  ["Ich habe Herrn Tanaka auf Englisch angerufen.", "I called Mr Tanaka in English."],
+  ["Ich lerne jeden Tag zu Hause Japanisch.", "I study Japanese at home every day."],
+];
+MIXED.forEach((m, i) => { m.tr = MIXED_TR[i]; });

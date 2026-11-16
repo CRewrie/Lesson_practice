@@ -73,6 +73,32 @@ function variants(sc, tails) {
 const flipped = sc => ({ ...sc, v: V(sc.v.pair), S: sc.O, O: sc.S });
 const validGive = sc => !(sc.v.id === "age" && sc.O.k === "わたし");
 
+// ---------- translating a scene ----------
+// The whole sentence in German or English (following the DE / EN switch at the top).
+function translate(sc) {
+  const S = WHO_TR[sc.S.k], me = sc.S.k === "わたし", tw = sc.tw ? TW_TR[sc.tw.k] : ["", ""], h = sc.clock, tidy = x => x.replace(/\s+/g, " ").replace(/ \./, ".").trim();
+  const hour = h ? +h.digit.match(/\d+/)[0] : 0, half = h && h.digit.includes("はん");
+  if (state.lang === "de") {
+    const at = h ? (half ? `um halb ${hour % 12 + 1}` : `um ${hour} Uhr`) : "";
+    if (sc.v.id === "ne") return tidy(sc.past ? `${S.n} ${me ? "bin" : "ist"} ${tw[0]} ${at} schlafen gegangen.` : `${S.n} ${me ? "gehe" : "geht"} ${tw[0]} ${at} schlafen.`);
+    if (sc.v.id === "oki") return tidy(sc.past ? `${S.n} ${me ? "bin" : "ist"} ${tw[0]} ${at} aufgestanden.` : `${S.n} ${me ? "stehe" : "steht"} ${tw[0]} ${at} auf.`);
+    if (sc.v.id === "owari") return tidy(`${S.n} ${sc.past ? "war" : "ist"} ${tw[0]} ${at} zu Ende.`);
+    const t = VERB_TR[sc.v.id], [ich, er, pp, sep, how] = t.de, O = WHO_TR[sc.O.k], refl = t.refl ? (me ? " mir" : " sich") : "";
+    // "mir / meinem Freund" comes before the time word, "von …" after it: "leiht mir morgen …", "bekommt morgen von … "
+    const mid = how === "v" ? `${tw[0]} ${O.v} ${THING_TR[sc.obj.k][0]}` : `${O[how]} ${tw[0]} ${THING_TR[sc.obj.k][0]}`;
+    return tidy(sc.past ? `${S.n} ${me ? "habe" : "hat"}${refl} ${mid} ${pp}.` : `${S.n} ${me ? ich : er}${refl} ${mid} ${sep}.`);
+  }
+  const future = sc.tw && ["あした", "らいしゅう", "こんばん"].includes(sc.tw.k);
+  const fin = ([base, s3, past]) => sc.past ? past : future ? "will " + base : me ? base : s3;
+  const at = h ? `at ${hour}:${half ? "30" : "00"}` : "";
+  if (sc.v.id === "ne") return tidy(`${S.s} ${fin(["go to bed", "goes to bed", "went to bed"])} ${at} ${tw[1]}.`);
+  if (sc.v.id === "oki") return tidy(`${S.s} ${fin(["get up", "gets up", "got up"])} ${at} ${tw[1]}.`);
+  if (sc.v.id === "owari") return tidy(`${S.s} ${sc.past ? "ended" : future ? "will end" : "ends"} ${at} ${tw[1]}.`);
+  const t = VERB_TR[sc.v.id].en, O = WHO_TR[sc.O.k];
+  return tidy(`${S.s} ${fin(t)} ${THING_TR[sc.obj.k][1]} ${t[3]} ${O.o} ${tw[1]}.`);
+}
+const trLine = it => { const t = it.mixed ? it.gaps.tr[state.lang === "de" ? 0 : 1] : translate(it.sc); return `<div class="tr-line">🌐 ${esc(t)}</div>`; };
+
 // ---------- drawing a scene ----------
 function who(p, isSubj) { return `<div class="who ${isSubj ? "subj" : ""}"><span class="we">${p.e}</span><span class="wk jp">${J(p.k)}</span>${isSubj ? `<span class="wtag jp">は</span>` : ""}</div>`; }
 const FAM_LABEL = { gift: "🎁 give / receive", lend: "🤝 lend / borrow", teach: "📖 teach / learn", call: "📞 phone", send: "📮 send" };
@@ -102,7 +128,8 @@ function diagnose(input, sc) {
       else if (has(p)) msgs.push(`Put <b class="jp">に</b> right after <span class="jp">${p}</span>.`);
       else msgs.push(`Say who: <b class="jp">${p}に</b>.`);
     }
-    if (!has(sc.obj.k + "を") && has(sc.obj.k)) msgs.push(`The thing takes <b class="jp">を</b>: <b class="jp">${sc.obj.k}を</b>.`);
+    if (!has(sc.obj.k)) msgs.push(`The thing is <b class="jp">${sc.obj.k}</b> (${esc(THING_TR[sc.obj.k][state.lang === "de" ? 0 : 1] || "phone")}) — check the spelling: <b class="jp">${sc.obj.k}を</b>.`);
+    else if (!has(sc.obj.k + "を")) msgs.push(`The thing takes <b class="jp">を</b>: <b class="jp">${sc.obj.k}を</b>.`);
   } else {
     if (sc.tw && has(sc.tw.k + "に")) msgs.push(`No に after <b class="jp">${sc.tw.k}</b> — it is not a clock time.`);
     const c = [sc.clock.kana, sc.clock.digit];
@@ -157,7 +184,8 @@ function build(ex, v) {
     return { ex, sc, prompt: `${diagram(sc, true)}<div class="q jp" style="text-align:center">${J(q)} ${spk(q)}</div>`, say: q, ask: me ? "Answer for yourself (わたし), in a sentence." : "Answer in a sentence.", accept: variants(sc, tails), model, hint: `Keep the particle from the question: <span class="jp">${q.includes("だれに") ? "だれ<b>に</b> → ＿<b>に</b>" : q.includes("なにを") ? "なに<b>を</b> → ＿<b>を</b>" : "なんじ<b>に</b> → ＿<b>に</b>"}</span>` };
   }
   // particles: the generated scene, or one of the mixed sentences so に has competition
-  const mixed = chance(0.35), ps = mixed ? pick(MIXED).map(([w, p]) => [w, p, ""]) : parts(sc);
+  const mixed = chance(0.35), src = mixed ? pick(MIXED) : null, ps = mixed ? src.map(([w, p]) => [w, p, ""]) : parts(sc);
+  if (mixed) ps.tr = src.tr;
   return { ex: "gap", sc, gaps: ps, mixed, model: sentence(ps) };
 }
 // which exercises a verb can appear in
@@ -253,7 +281,7 @@ function ask(it, head, doneOnce) {
     inp.value = finishKana(inp.value); const got = key(inp.value); if (!got) return;
     open = false; inp.disabled = true; $("#hint").style.display = "none";
     const ok = it.accept.has(got); beep(ok); speak(it.model);
-    const model = `<div class="row">${spk(it.model)}<span class="ja jp" style="font-size:20px">${J(it.model)}</span></div>`;
+    const model = `<div class="row">${spk(it.model)}<span class="ja jp" style="font-size:20px">${J(it.model)}</span></div>${trLine(it)}`;
     if (ok) {
       $("#fb").innerHTML = `<div class="fb ok"><div class="h">せいかい！ ✓${hinted ? " (with hint)" : ""}</div>${model}${it.why ? `<div class="small">🛠️ ${it.why}</div>` : ""}<div class="small" style="margin-top:6px">💡 ${rule(it.sc)}</div></div>`;
       $("#go").textContent = "Next →"; $("#go").onclick = () => done(true, !hinted); $("#go").focus();
@@ -294,7 +322,7 @@ function askGaps(it, head, doneOnce) {
     beep(ok); speak(it.model);
     const notes = [];
     ps.forEach(([w, p, t], k) => { if (k < ps.length - 1 && !res[k]) notes.push(!p ? `<span class="jp">${w}</span> takes nothing — it is not a clock time or date.` : t === "C" ? `Clock time → <b class="jp">に</b>.` : t === "P" ? `The person → <b class="jp">に</b>.` : t === "O" ? `The thing → <b class="jp">を</b>.` : `<span class="jp">${w}<b>${p}</b></span>`); });
-    $("#fb").innerHTML = `<div class="fb ${ok ? "ok" : "no"}"><div class="h">${ok ? "せいかい！ ✓" : "Not yet"}</div><div class="row">${spk(it.model)}<span class="ja jp" style="font-size:20px">${J(it.model)}</span></div>
+    $("#fb").innerHTML = `<div class="fb ${ok ? "ok" : "no"}"><div class="h">${ok ? "せいかい！ ✓" : "Not yet"}</div><div class="row">${spk(it.model)}<span class="ja jp" style="font-size:20px">${J(it.model)}</span></div>${trLine(it)}
       ${notes.length ? `<ul class="diag">${notes.map(m => `<li>${m}</li>`).join("")}</ul>` : ""}${it.mixed ? "" : `<div class="small" style="margin-top:6px">💡 ${rule(it.sc)}</div>`}</div>`;
     $("#go").textContent = "Next →"; $("#go").onclick = () => done(ok, true); $("#go").focus();
   };
@@ -324,7 +352,7 @@ function sortGame() {
       $$(".opt").forEach(x => { x.disabled = true; if (x.dataset.r === v.role) x.classList.add("right"); }); if (!ok) b.classList.add("wrong");
       if (ok && !v._again) first++; if (!ok) { v._again = true; queue.push(v); }
       const sc = makeScene(v), s = sentence(parts(sc));
-      $("#fb").innerHTML = `<div class="fb ${ok ? "ok" : "no"}"><div class="h">${ok ? "せいかい！ ✓" : "✗ " + ROLES[v.role].ico + " " + ROLES[v.role].name}</div><div class="row">${spk(s)}<span class="ja jp">${J(s)}</span></div><div class="small">💡 ${ROLES[v.role].rule}</div></div>
+      $("#fb").innerHTML = `<div class="fb ${ok ? "ok" : "no"}"><div class="h">${ok ? "せいかい！ ✓" : "✗ " + ROLES[v.role].ico + " " + ROLES[v.role].name}</div><div class="row">${spk(s)}<span class="ja jp">${J(s)}</span></div>${trLine({ sc })}<div class="small">💡 ${ROLES[v.role].rule}</div></div>
         <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn primary" id="nx">Next →</button></div>`;
       $("#nx").onclick = () => { i++; show(); }; $("#nx").focus();
     };

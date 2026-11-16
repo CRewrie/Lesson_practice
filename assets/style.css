@@ -330,3 +330,4 @@ ul.diag { margin: 8px 0 0; padding-left: 18px; font-size: 14px; }
 .gp-in.ok { border-color: var(--good); background: var(--good-soft); color: var(--good); }
 .gp-in.no { border-color: var(--bad); background: var(--bad-soft); color: var(--bad); text-decoration: line-through; }
 .gfix { color: var(--good); font-weight: 700; margin-right: 4px; }
+.tr-line { font-size: 14px; color: var(--muted); margin: 4px 0 2px; }
