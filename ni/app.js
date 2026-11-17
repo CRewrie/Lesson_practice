@@ -141,7 +141,8 @@ function diagnose(input, sc) {
 // ---------- exercises ----------
 // Each builder returns what ask() needs: prompt, the accepted keys, the model sentence, the rule to show.
 const EXS = [
-  { id: "mix", ico: "🎲", name: "Everything mixed", note: "all five exercises" },
+  { id: "one", ico: "⚡", name: "One word", note: "fastest: you see the meaning and type only the particle or the verb" },
+  { id: "mix", ico: "🎲", name: "Everything mixed", note: "the five sentence exercises" },
   { id: "pic", ico: "🖼️", name: "Picture → sentence", note: "like the worksheet: build the sentence" },
   { id: "flip", ico: "🔄", name: "Switch the view", note: "same event, other person as subject" },
   { id: "gap", ico: "✏️", name: "Particles", note: "に against は・を・で・と・へ — or nothing" },
@@ -182,6 +183,17 @@ function build(ex, v) {
     else if (sc.v.fam === "call" || chance(0.6)) { q = `${subj}${tw}だれに ${sc.obj.k}を ${v_}か。`; tails = [sc.O.k + "に", ...(sc.v.role === "from" ? [sc.O.k + "から"] : [])]; model = `${sc.O.k}に ${v_}。`; }
     else { q = `${subj}${tw}${sc.O.k}に なにを ${v_}か。`; tails = [sc.obj.k + "を"]; model = `${sc.obj.k}を ${v_}。`; }
     return { ex, sc, prompt: `${diagram(sc, true)}<div class="q jp" style="text-align:center">${J(q)} ${spk(q)}</div>`, say: q, ask: me ? "Answer for yourself (わたし), in a sentence." : "Answer in a sentence.", accept: variants(sc, tails), model, hint: `Keep the particle from the question: <span class="jp">${q.includes("だれに") ? "だれ<b>に</b> → ＿<b>に</b>" : q.includes("なにを") ? "なに<b>を</b> → ＿<b>を</b>" : "なんじ<b>に</b> → ＿<b>に</b>"}</span>` };
+  }
+  if (ex === "one") {
+    // One gap only, and never a noun: either the verb (direction + tense) or a particle.
+    const verbGap = chance(0.45), src = !verbGap && chance(0.25) ? pick(MIXED) : null, ps = src ? src.map(([w, p]) => [w, p, ""]) : parts(sc);
+    if (src) ps.tr = src.tr;
+    let k = ps.length - 1;
+    if (!verbGap) {
+      const w = ps.slice(0, -1).map(([, p, t]) => src ? (p === "は" ? 1 : 4) : ({ P: 5, C: 5, T: 3, O: 1, S: 1 })[t]);
+      let r = Math.random() * w.reduce((a, b) => a + b, 0); k = 0; while ((r -= w[k]) > 0) k++;
+    }
+    return { ex, sc, gaps: ps, mixed: !!src, k, verbGap, model: sentence(ps) };
   }
   // particles: the generated scene, or one of the mixed sentences so に has competition
   const mixed = chance(0.35), src = mixed ? pick(MIXED) : null, ps = mixed ? src.map(([w, p]) => [w, p, ""]) : parts(sc);
@@ -247,9 +259,9 @@ function round() {
     if (i >= queue.length) return finish();
     const q = queue[i], it = q.item, e = EXS.find(x => x.id === it.ex);
     const head = `${backBtn}<div class="plabel"><span>${e.ico} ${e.name}${q.retry ? " · again" : ""} · ${i + 1} / ${queue.length}</span><span>✓ ${first}</span></div><div class="progress"><div style="width:${i / queue.length * 100}%"></div></div>`;
-    (it.ex === "gap" ? askGaps : ask)(it, head, (ok, clean) => {
+    (it.ex === "gap" ? askGaps : it.ex === "one" ? askOne : ask)(it, head, (ok, clean) => {
       if (!q.retry) { answered++; if (!it.mixed) record(it.sc.v.id, ok && clean); if (ok && clean) first++; save(); }
-      if (ok) addXP(it.ex === "gap" ? 5 : 10);
+      if (ok) addXP(it.ex === "gap" || it.ex === "one" ? 5 : 10);
       else queue.splice(Math.min(queue.length, i + 3), 0, { item: build(it.ex, it.sc.v), retry: true });   // same pattern, new scene, a few cards later
       i++; show();
     });
@@ -328,6 +340,53 @@ function askGaps(it, head, doneOnce) {
   };
   $("#go").onclick = check;
   ins.forEach((x, k) => x.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); if (ins[k + 1] && open) ins[k + 1].focus(); else check(); } });
+}
+
+// one-word card: the meaning is given, the sentence has a single gap (a particle or the verb).
+// A right answer moves on by itself after a moment, so a round goes quickly.
+function askOne(it, head, doneOnce) {
+  keyHandler = null; app._it = it;
+  let fired = false, hinted = false, open = true, timer = null;
+  const done = (ok, clean) => { if (fired) return; fired = true; clearTimeout(timer); doneOnce(ok, clean); };
+  const ps = it.gaps, k = it.k, [word, want, tag] = ps[k];
+  const field = `<input class="gp-in ${it.verbGap ? "wide" : ""}" id="in" autocomplete="off" autocapitalize="off" spellcheck="false">`;
+  const line = ps.map(([w, pt], i) => i === k ? (it.verbGap ? field : `<span class="gw">${J(w)}</span>${field}`) : `<span class="gw">${J(w)}</span><span class="gpart">${pt}</span>`).join("") + "。";
+  app.innerHTML = `${head}<div class="card stack">${trLine(it).replace("tr-line", "tr-line big")}
+    <div class="gapline jp">${line}</div>
+    <div class="row" style="justify-content:space-between"><button class="btn" id="hint">💡 Hint</button>
+      <span class="row">${it.verbGap ? "" : `<button class="btn" id="none">✕ nothing</button>`}<button class="btn primary" id="go">Check</button></span></div><div id="fb"></div></div>`;
+  const inp = $("#in"); liveKana(inp); inp.focus();
+  const accept = it.verbGap ? [word] : [want, ...(tag === "P" && it.sc.v.role === "from" && !it.mixed ? ["から"] : [])];
+  $("#hint").onclick = () => {
+    hinted = true;
+    $("#fb").innerHTML = `<div class="small muted">${it.verbGap ? `The verb is <b class="jp">${it.sc.v.stem}ます</b> (${esc(mean(it.sc.v))}) — now choose ます or ました.`
+      : tag === "T" ? "Does this time word contain a number?" : tag === "C" ? "A clock time is a point in time." : tag === "P" ? "Who does it go to, or come from?" : "What job does this word have: topic, thing, place, tool, companion?"}</div>`;
+    inp.focus();
+  };
+  const settle = raw => {
+    if (!open) return; open = false;
+    const got = key(finishKana(raw)).replace(/[x×✕\-ー]/g, ""), ok = accept.some(a => key(a) === got);
+    inp.value = raw === "" ? "✕" : finishKana(raw); inp.disabled = true; inp.classList.add(ok ? "ok" : "no"); $("#hint").style.display = "none"; $("#none")?.remove();
+    beep(ok); speak(it.model);
+    const model = `<div class="row">${spk(it.model)}<span class="ja jp" style="font-size:20px">${J(it.model)}</span></div>`;
+    if (ok) {
+      $("#fb").innerHTML = `<div class="fb ok"><div class="h">せいかい！ ✓</div>${model}</div>`;
+      $("#go").textContent = "Next →"; $("#go").onclick = () => done(true, !hinted); $("#go").focus();
+      timer = setTimeout(() => done(true, !hinted), 1100);
+      return;
+    }
+    let why;
+    if (it.verbGap) why = diagnose(raw, it.sc).filter(m => /ます|ました/.test(m))[0] || `The verb here is <b class="jp">${word}</b>.`;
+    else why = !want ? `<span class="jp">${word}</span> takes nothing — it is not a clock time or date.` : tag === "C" ? `A clock time is a point in time → <b class="jp">に</b>.`
+      : tag === "P" ? ROLES[it.sc.v.role].rule : tag === "O" ? `The thing takes <b class="jp">を</b>.` : tag === "S" ? `The subject is the topic → <b class="jp">は</b>.`
+      : ({ "と": "Together with someone → <b class=\"jp\">と</b>.", "で": "The tool, the language or the place of an action → <b class=\"jp\">で</b>.", "へ": "Where you are heading → <b class=\"jp\">へ</b>.", "に": "The person the action goes to (or the one you meet) → <b class=\"jp\">に</b>.",
+          "を": "The thing the action is done to → <b class=\"jp\">を</b>.", "から": "Starting point → <b class=\"jp\">から</b>.", "まで": "End point → <b class=\"jp\">まで</b>.", "は": "The topic → <b class=\"jp\">は</b>." })[want];
+    $("#fb").innerHTML = `<div class="fb no"><div class="h">Not yet — it is <b class="jp">${want || (it.verbGap ? word : "✕ nothing")}</b></div>${model}<div class="small" style="margin-top:6px">💡 ${why}</div></div>`;
+    $("#go").textContent = "Next →"; $("#go").onclick = () => done(false, false); $("#go").focus();
+  };
+  $("#go").onclick = () => { if (inp.value.trim()) settle(inp.value); };
+  if ($("#none")) $("#none").onclick = () => settle("");
+  inp.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); if (inp.value.trim()) settle(inp.value); } };
 }
 
 // ---------- sort the verbs (worksheet part 1) ----------
