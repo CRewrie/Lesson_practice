@@ -341,3 +341,12 @@ ul.diag { margin: 8px 0 0; padding-left: 18px; font-size: 14px; }
 .gp-in.wide { width: 8.5em; }
 .gpart { color: var(--muted); margin-right: 2px; }
 .tr-line.big { font-size: 18px; color: var(--ink); font-weight: 600; text-align: center; margin: 4px 0 0; }
+
+/* より dojo: data card */
+.dcard { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: var(--bg); }
+.drow { display: grid; grid-template-columns: 30px minmax(70px, auto) 1fr auto; gap: 8px; align-items: center; padding: 3px 0; }
+.drow .de { font-size: 22px; text-align: center; }
+.drow .dk { font-size: 16px; white-space: nowrap; }
+.dbar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.dbar span { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+.drow .dv { font-size: 13px; color: var(--muted); white-space: nowrap; text-align: right; }

@@ -64,6 +64,14 @@ The particle に as a point in time (10じに ねます), as the person an actio
 - **Adaptive and spaced.** Verbs you miss are drawn more often, a missed pattern returns in the same round with a new scene, and each verb comes due again after 1, 3, 7, 14 and 30 days.
 - **Sort the verbs** is the worksheet's first task; the **に map** has the rules and the worksheet solution.
 
+## より・ほうが道場 — comparing (`yori/`)
+
+Comparisons of two things (AはBより～, Bの ほうが～, AとBと どちらが～ですか) and of three or more (＿で なに／どこ／だれ／いつが いちばん～ですか, Xが いちばん～です). Every card is built from a data set with real values (weights, speeds, temperatures, heights, areas, prices, noise levels), so you have to read the data and decide the direction yourself.
+
+- **Exercises.** One word (fastest; for an adjective gap the translation is hidden so the data decides) · data → sentence · answer the question · turn it around (the opposite adjective) · read fast (tap who wins) · fix the mistake.
+- **Feedback** recognises a sentence that contradicts the data, いちばん with two things, どちら with three, the wrong question word for the group, a missing の before ほう, な before です, and は instead of が.
+- **Adaptive and spaced** per pattern, like the に Dojo. Plus a one-page map and "Talk about you" (your own preferences).
+
 ## Code layout
 
 - `assets/core.js`: the shared engine (progress, audio, romaji → kana typing, kanji with furigana, flashcards, sentence builder, memory, typing, multiple choice, router).
@@ -71,6 +79,7 @@ The particle に as a point in time (10じに ねます), as the person an actio
 - `lessonNN/data.js`: the lesson's content and its `LESSON` settings.
 - `lessonNN/app.js`: the lesson's path (`MODES`) and its own games. It ends with `boot()`.
 - `ni/`: the に Dojo, with its own scene generator.
+- `yori/`: the より Dojo, with its comparison data sets.
 - `questions/`: the Question Dojo. It uses the shared helpers but has its own dashboard and scheduler.
 
 ## Voices

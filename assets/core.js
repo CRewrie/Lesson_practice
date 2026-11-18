@@ -18,7 +18,7 @@ const vById = id => VOCAB.find(v => v.id === id);
 const jpOf = v => v.kanji ? ruby(v.kanji) : esc(v.kana);
 // Write kana words in kanji with furigana. Works chunk by chunk (text is spaced by word + particle).
 const KANJI_KEYS = Object.keys(KANJI).sort((a, b) => b.length - a.length);
-const AFTER = /^(?:$|の|に|が|は|も|や|と|を|で|へ|ね|よ|など|です|でした|じゃ|だ|か$|まで|から|ぐらい|くらい|だけ|ずつ)/;
+const AFTER = /^(?:$|の|に|が|は|も|や|と|を|で|へ|ね|よ|など|です|でした|じゃ|だ|か$|まで|から|ぐらい|くらい|だけ|ずつ|より)/;
 function kanjify(text) {
   return String(text ?? "")
     .replace(/(おとこ|おんな)の ?こ(?=[がはもをにと。、\s]|$)/g, (m, w) => `${KANJI[w]}の{子|こ}`)
