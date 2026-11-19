@@ -70,7 +70,20 @@ Comparisons of two things (AはBより～, Bの ほうが～, AとBと どちら
 
 - **Exercises.** One word (fastest; for an adjective gap the translation is hidden so the data decides) · data → sentence · answer the question · turn it around (the opposite adjective) · read fast (tap who wins) · fix the mistake.
 - **Feedback** recognises a sentence that contradicts the data, いちばん with two things, どちら with three, the wrong question word for the group, a missing の before ほう, な before です, and は instead of が.
+- **Short answers** (on by default): the sentence exercises show the sentence and ask only for the key part — `いぬより おもい`, `どちらが はやい`, just the adjective when turning a comparison around. Switch to full sentences on the dashboard.
 - **Adaptive and spaced** per pattern, like the に Dojo. Plus a one-page map and "Talk about you" (your own preferences).
+
+## こと・の・さ道場 — making nouns (`nouns/`)
+
+How verbs and adjectives become nouns, practised one word or chunk at a time:
+
+- **Dictionary form** (needed for こと／の): groups 1, 2, 3, with the traps (かえります is group 1, かります group 2).
+- **Verb + こと／の**: しゅみは ～ことです, ～ことが できます (only こと) · ～のが じょうず, ～のを わすれました (only の) · ～のが すき, ～のは たのしい (both).
+- **Adjective + さ／み**: たかさ, しずかさ, いい→よさ, きれいさ · たのしみ, いたみ, あまみ.
+- **ます-stem as noun and ～かた**: やすみ, かえり, はなし · よみかた, つかいかた, しかた.
+- **Adjective + の** ("the … one"): やすいの, しずかなの.
+
+Exercises: make the form · in context (one gap) · こと or の? · fix the word. Wrong answers are diagnosed (wrong verb group, keeping ます, いいさ, きれさ, な before さ, missing な before の, こと／の in the wrong pattern). Plus a one-page map and "Talk about you" (type only the activity).
 
 ## Code layout
 
@@ -80,6 +93,7 @@ Comparisons of two things (AはBより～, Bの ほうが～, AとBと どちら
 - `lessonNN/app.js`: the lesson's path (`MODES`) and its own games. It ends with `boot()`.
 - `ni/`: the に Dojo, with its own scene generator.
 - `yori/`: the より Dojo, with its comparison data sets.
+- `nouns/`: the こと・の・さ Dojo.
 - `questions/`: the Question Dojo. It uses the shared helpers but has its own dashboard and scheduler.
 
 ## Voices

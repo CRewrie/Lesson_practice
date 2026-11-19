@@ -8,7 +8,7 @@
 const key = s => unLong(norm(s)).replace(/を/g, "お").replace(/は/g, "わ").replace(/へ/g, "え");
 const cap = s => s[0].toUpperCase() + s.slice(1);
 const de = () => state.lang === "de";
-state.yo = Object.assign({ st: {}, focus: "all", ex: "one", n: 10 }, state.yo || {});
+state.yo = Object.assign({ st: {}, focus: "all", ex: "one", n: 10, short: true }, state.yo || {});
 const pref = state.yo;
 const IV = [0, 1, 3, 7, 14, 30];
 const dayShift = +(new URLSearchParams(location.search).get("day") || 0);
@@ -142,6 +142,15 @@ const ONE_GAPS = {        // [token index, particle?, weight]
   qsup: [[0, true, 1], [1, false, 3], [2, false, 2]],
   asup: [[0, true, 2], [1, false, 2], [2, false, 2]],
 };
+// Short answers: show the sentence with only the key chunk missing (tokens i0..i1; a final です／ですか stays outside).
+function shorten(card, i0, i1) {
+  if (!pref.short) return card;
+  const ts = tokens(card.it), join = xs => xs.map(([w, p]) => w + p).join(" ");
+  const last = ts[i1], keepOut = /^です/.test(last[1]) ? last[1] : "";
+  const chunk = join(ts.slice(i0, i1)) + (i1 > i0 ? " " : "") + last[0] + (keepOut ? "" : last[1]);
+  const after = ts.slice(i1 + 1);
+  return { ...card, short: true, pre: join(ts.slice(0, i0)) + (i0 ? " " : ""), post: keepOut + (after.length ? " " + join(after) : "") + "。", chunk };
+}
 function build(ex, pattern) {
   if (ex === "one") {
     const it = makeItem(pattern), ts = tokens(it), opts = ONE_GAPS[pattern];
@@ -154,16 +163,19 @@ function build(ex, pattern) {
   if (ex === "build") {
     const it = makeItem(pattern), t = `„${esc(translate(it))}“`;
     const ask = pattern === "yori" ? `Compare them. Start with <b class="jp">${J(it.A.k)}は</b> …` : pattern === "asup" ? `Say which one is <b>${esc(de() ? it.adj.deS : it.adj.enS)}</b>.` : `Ask: ${t}`;
-    return { ex, it, pattern, prompt: dataCard(it) + (pattern === "yori" ? pairChip(it) : ""), ask, accept: accept(it), model: sentence(tokens(it)) };
+    const card = { ex, it, pattern, prompt: dataCard(it) + (pattern === "yori" ? pairChip(it) : ""), ask, accept: accept(it), model: sentence(tokens(it)) };
+    return shorten(card, ...{ yori: [1, 2], q2: [2, 3], qsup: [1, 3], asup: [0, 0] }[pattern]);
   }
   if (ex === "qa") {
     const it = makeItem(pattern), qit = { ...it, pattern: pattern === "hou" ? "q2" : "qsup" }, q = sentence(tokens(qit));
-    return { ex, it, pattern, prompt: dataCard(it) + `<div class="q jp" style="text-align:center">${J(q)} ${spk(q)}</div>`, say: q, ask: "Answer in a full sentence.", accept: accept(it), model: sentence(tokens(it)), qTr: translate(qit) };
+    const card = { ex, it, pattern, prompt: dataCard(it) + `<div class="q jp" style="text-align:center">${J(q)} ${spk(q)}</div>`, say: q, ask: pref.short ? "Complete the answer." : "Answer in a full sentence.", accept: accept(it), model: sentence(tokens(it)), qTr: translate(qit) };
+    return shorten(card, 0, pattern === "hou" ? 1 : 0);
   }
   if (ex === "flip") {
     const src = makeItem("yori"), it = { ...src, A: src.B, B: src.A, adj: src.opp, opp: src.adj }, s = sentence(tokens(src));
-    return { ex, it, pattern, prompt: dataCard(src) + `<div class="q jp" style="text-align:center">${J(s)} ${spk(s)}</div><p style="text-align:center;margin:0">Same fact — now start with <b class="jp hl-p">${J(it.A.k)}は</b> …</p>`, say: s,
+    const card = { ex, it, pattern, prompt: dataCard(src) + `<div class="q jp" style="text-align:center">${J(s)} ${spk(s)}</div><p style="text-align:center;margin:0">Same fact — now start with <b class="jp hl-p">${J(it.A.k)}は</b> …</p>`, say: s,
       ask: "", accept: accept(it), model: sentence(tokens(it)), src };
+    return shorten(card, 2, 2);
   }
   if (ex === "read") {
     const it = makeItem(pattern), askAdj = pick([it.d.hi, it.d.lo]), right = askAdj === it.d.hi ? it.hiWin : it.loWin;
@@ -173,15 +185,16 @@ function build(ex, pattern) {
   // fix: one typical error
   const it = makeItem(pattern), ts = tokens(it), errs = [];
   const put = (i, w, p) => sentence(ts.map((t, k) => k === i ? [w ?? t[0], p ?? t[1]] : t));
-  if (it.adj.na) errs.push([put(ts.length - 1, it.adj.k + "な"), "な-adjectives drop the な before です."]);
-  if (pattern === "yori") errs.push([put(2, it.opp.k), "The data says the opposite. Change the adjective (or swap the two things)."]);
-  if (pattern === "hou") errs.push([sentence([[it.win.k + "ほう", "が"], [it.adj.k, "です"]]), "の is missing: <span class=\"jp\">Xの ほうが</span>."], [put(0, it.lose.k), "The other one wins — look at the data."]);
-  if (pattern === "q2") errs.push([sentence([...ts.slice(0, 3), ["いちばん", ""], ts[3]]), "No いちばん with two things."], [put(2, pick(["なに", "どれ"])), "Two things → どちら."]);
-  if (pattern === "qsup") errs.push([put(1, "どちら"), `どちら is for two. Here: ${it.d.q}.`], [put(1, pick(["なに", "どこ", "だれ", "いつ"].filter(q => !QW_ALT[it.d.q].includes(q)))), `For ${it.d.cat} the question word is ${it.d.q}.`]);
-  if (pattern === "asup") errs.push([put(0, pick(it.ents.filter(e => e !== it.win)).k), "Someone else wins — look at the data."], [put(0, undefined, "は"), "The answer to a question word takes が."]);
-  const [wrong, why] = pick(errs), acc_ = accept(it);
+  const n = ts.length - 1;
+  if (it.adj.na) errs.push([put(n, it.adj.k + "な"), "な-adjectives drop the な before です.", [n, n]]);
+  if (pattern === "yori") errs.push([put(2, it.opp.k), "The data says the opposite. Change the adjective (or swap the two things).", [2, 2]]);
+  if (pattern === "hou") errs.push([sentence([[it.win.k + "ほう", "が"], [it.adj.k, "です"]]), "の is missing: <span class=\"jp\">Xの ほうが</span>.", [0, 1]], [put(0, it.lose.k), "The other one wins — look at the data.", [0, 0]]);
+  if (pattern === "q2") errs.push([sentence([...ts.slice(0, 3), ["いちばん", ""], ts[3]]), "No いちばん with two things.", [2, 3]], [put(2, pick(["なに", "どれ"])), "Two things → どちら.", [2, 2]]);
+  if (pattern === "qsup") errs.push([put(1, "どちら"), `どちら is for two. Here: ${it.d.q}.`, [1, 1]], [put(1, pick(["なに", "どこ", "だれ", "いつ"].filter(q => !QW_ALT[it.d.q].includes(q)))), `For ${it.d.cat} the question word is ${it.d.q}.`, [1, 1]]);
+  if (pattern === "asup") errs.push([put(0, pick(it.ents.filter(e => e !== it.win)).k), "Someone else wins — look at the data.", [0, 0]], [put(0, undefined, "は"), "The answer to a question word takes が.", [0, 0]]);
+  const [wrong, why, range] = pick(errs), acc_ = accept(it);
   if (pattern === "yori") for (const k_ of accept({ ...it, A: it.B, B: it.A, adj: it.opp })) acc_.add(k_);   // swapping the two things also fixes it
-  return { ex, it, pattern, prompt: dataCard(it) + trLine(it, true) + `<div class="q jp wrong-line">✗ ${J(wrong)}</div>`, ask: "One thing is wrong. Type the whole sentence correctly.", accept: acc_, model: sentence(ts), why };
+  return shorten({ ex, it, pattern, prompt: dataCard(it) + trLine(it, true) + `<div class="q jp wrong-line">✗ ${J(wrong)}</div>`, ask: pref.short ? "One thing is wrong. Type the correct part." : "One thing is wrong. Type the whole sentence correctly.", accept: acc_, model: sentence(ts), why }, ...range);
 }
 function plan() {
   const exs = pref.ex === "mix" ? ["one", "build", "qa", "flip", "fix", "read"] : [pref.ex];
@@ -208,7 +221,8 @@ function dash() {
     <div class="card stack">
       <div><div class="plabel"><b>Focus</b><span></span></div><div class="row">${chip(pref.focus === "all", `data-focus="all"`, "All")}${chip(pref.focus === "two", `data-focus="two"`, "⚖️ Two things")}${chip(pref.focus === "three", `data-focus="three"`, "🏆 Three or more")}</div></div>
       <div><div class="plabel"><b>Exercise</b><span>${EXS.find(e => e.id === pref.ex).note}</span></div><div class="row">${EXS.map(e => chip(pref.ex === e.id, `data-ex="${e.id}"`, `${e.ico} ${e.name}`)).join("")}</div></div>
-      <div><div class="plabel"><b>Cards</b><span></span></div><div class="row">${[10, 20, 30].map(n => chip(pref.n === n, `data-n="${n}"`, n)).join("")}</div></div>
+      <div><div class="plabel"><b>Cards</b><span></span></div><div class="row">${[10, 20, 30].map(n => chip(pref.n === n, `data-n="${n}"`, n)).join("")}<span style="flex:1"></span>
+        ${chip(pref.short, `data-short="1"`, pref.short ? "✂️ Short answers: only the key part" : "📝 Full sentences")}</div></div>
       <div class="row"><a class="btn primary ${usable ? "" : "off"}" href="#/round">Start round →</a>${usable ? "" : `<span class="small muted">This exercise has no “three or more” version — pick another focus.</span>`}</div>
     </div>
     <div class="path" style="margin-top:12px">
@@ -219,7 +233,7 @@ function dash() {
       return `<div class="qw ${a === null ? "" : s.n >= 4 && a >= 85 ? "gold" : a >= 65 ? "strong" : "learning"}"><span class="e">${p.two ? "⚖️" : "🏆"}</span><span><span class="k jp" style="font-size:14px">${esc(p.label)}</span><br><span class="m">${a === null ? "not tried yet" : `${a}% of ${s.n}${isDue(id) ? " · 🔁" : ""}`}</span></span></div>`; }).join("")}</div>
     <p class="small muted" style="margin-top:20px">First-try results per pattern. 🔁 = due for a refresher (after 1, 3, 7, 14, 30 days). Due and weak patterns come up more often.
       <button class="back" id="reset">Reset progress</button></p>`;
-  $$(".pchip").forEach(c => c.onclick = () => { const d = c.dataset; if (d.focus) pref.focus = d.focus; if (d.ex) pref.ex = d.ex; if (d.n) pref.n = +d.n; save(); dash(); });
+  $$(".pchip").forEach(c => c.onclick = () => { const d = c.dataset; if (d.focus) pref.focus = d.focus; if (d.ex) pref.ex = d.ex; if (d.n) pref.n = +d.n; if (d.short) pref.short = !pref.short; save(); dash(); });
   $("#reset").onclick = () => { if (confirm("Delete all より Dojo progress?")) { localStorage.removeItem(KEY); location.reload(); } };
 }
 
@@ -234,7 +248,7 @@ function round() {
     const head = `${backBtn}<div class="plabel"><span>${e.ico} ${e.name}${q.retry ? " · again" : ""} · ${i + 1} / ${queue.length}</span><span>✓ ${first}</span></div><div class="progress"><div style="width:${i / queue.length * 100}%"></div></div>`;
     ({ one: askOne, read: askRead }[it.ex] || ask)(it, head, (ok, clean) => {
       if (!q.retry) { answered++; record(it.pattern, ok && clean); if (ok && clean) first++; save(); }
-      if (ok) addXP(it.ex === "one" || it.ex === "read" ? 4 : 10);
+      if (ok) addXP(it.ex === "one" || it.ex === "read" ? 4 : it.short ? 6 : 10);
       else queue.splice(Math.min(queue.length, i + 3), 0, { item: build(it.ex, it.pattern), retry: true });
       i++; show();
     });
@@ -255,14 +269,17 @@ function round() {
 function ask(c, head, doneOnce) {
   keyHandler = null; app._it = c;
   let fired = false, hinted = false, open = true; const done = (ok, clean) => { if (fired) return; fired = true; doneOnce(ok, clean); };
+  const input = c.short ? `<div class="gapline jp">${J(c.pre)}<input class="gp-in chunk" id="in" autocomplete="off" autocapitalize="off" spellcheck="false">${J(c.post)}</div>`
+    : `<input class="type-in" id="in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type the sentence (romaji → kana)">`;
   app.innerHTML = `${head}<div class="card stack">${c.prompt}${c.ask ? `<p class="small muted" style="margin:0;text-align:center">${c.ask}</p>` : ""}
-    <input class="type-in" id="in" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="type the sentence (romaji → kana)">
+    ${input}
     <div class="row" style="justify-content:space-between"><button class="btn" id="hint">💡 Hint</button><button class="btn primary" id="go">Check</button></div><div id="fb"></div></div>`;
   const inp = $("#in"); liveKana(inp); inp.focus(); if (c.say) speak(c.say);
   $("#hint").onclick = () => { hinted = true; $("#fb").innerHTML = `<div class="small muted">Pattern: <span class="jp">${esc(PAT[c.pattern].label)}</span></div>`; inp.focus(); };
   const check = () => {
     if (!open) return;
-    inp.value = finishKana(inp.value); const got = key(inp.value); if (!got) return;
+    inp.value = finishKana(inp.value); if (!key(inp.value)) return;
+    const typed = c.short ? c.pre + inp.value + c.post : inp.value, got = key(typed);
     open = false; inp.disabled = true; $("#hint").style.display = "none";
     const ok = c.accept.has(got); beep(ok); speak(c.model);
     const model = `<div class="row">${spk(c.model)}<span class="ja jp" style="font-size:20px">${J(c.model)}</span></div>${trLine(c.it)}`;
@@ -272,8 +289,8 @@ function ask(c, head, doneOnce) {
       $("#go").textContent = "Next →"; $("#go").onclick = () => done(true, !hinted); $("#go").focus();
       return;
     }
-    const msgs = diagnose(inp.value, c.it, c.pattern);
-    $("#fb").innerHTML = `<div class="fb no"><div class="h">Not yet — a correct sentence:</div>${model}
+    const msgs = diagnose(typed, c.it, c.pattern);
+    $("#fb").innerHTML = `<div class="fb no"><div class="h">Not yet — ${c.short ? `it is <b class="jp">${J(c.chunk)}</b>` : "a correct sentence:"}</div>${model}
       ${msgs.length ? `<ul class="diag">${msgs.map(m => `<li>${m}</li>`).join("")}</ul>` : `<div class="small">The parts look right — check the order and spelling against the model.</div>`}${extra}</div>
       <div class="row" style="justify-content:space-between;margin-top:10px"><button class="btn" id="mine">✓ Mine means the same</button><button class="btn primary" id="nx">Next →</button></div>`;
     $("#go").style.display = "none";
